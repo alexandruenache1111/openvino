@@ -300,12 +300,12 @@ std::vector<std::string> disabledTestPatterns() {
                 ".*CompilationForSpecificPlatform.*(3800|3900).*",
         });
 
-        // [Track number: E#67741]
-        _skipRegistry.addPatterns(
-                "Cannot call setShape for Blobs", {
-                R"(.*(smoke_Behavior|smoke_Auto_Behavior|smoke_Multi_Behavior).*OVInferRequestIOTensorTest.*canInferAfterIOBlobReallocation.*)",
-                R"(.*(smoke_Behavior|smoke_Auto_Behavior|smoke_Multi_Behavior).*OVInferRequestIOTensorTest.*InferStaticNetworkSetChangedInputTensorThrow.*targetDevice=(NPU_|MULTI_configItem=MULTI_DEVICE_PRIORITIES_NPU).*)"
-        });
+        // // [Track number: E#67741]
+        // _skipRegistry.addPatterns(
+        //         "Cannot call setShape for Blobs", {
+        //         R"(.*(smoke_Behavior|smoke_Auto_Behavior|smoke_Multi_Behavior).*OVInferRequestIOTensorTest.*canInferAfterIOBlobReallocation.*)",
+        //         R"(.*(smoke_Behavior|smoke_Auto_Behavior|smoke_Multi_Behavior).*OVInferRequestIOTensorTest.*InferStaticNetworkSetChangedInputTensorThrow.*targetDevice=(NPU_|MULTI_configItem=MULTI_DEVICE_PRIORITIES_NPU).*)"
+        // });
 
         // [Track number: E#67749]
         _skipRegistry.addPatterns(
@@ -313,16 +313,16 @@ std::vector<std::string> disabledTestPatterns() {
                 ".*CachingSupportCase_NPU.*CompileModelCacheTestBase.*CompareWithRefImpl.*ReadConcatSplitAssign.*",
         });
 
-        // [Tracking number: E#99817]
-        _skipRegistry.addPatterns(
-                "NPU Plugin currently fails to get a valid output in these test cases", {
-                ".*OVInferRequestIOTensorTest.InferStaticNetworkSetChangedInputTensorThrow.*",
-                ".*OVInferRequestIOTensorTestNPU.InferStaticNetworkSetChangedInputTensorThrow.*",
-                R"(.*OVInferRequestIOTensorTestNPU.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_.*)",
-                R"(.*OVInferRequestIOTensorTestNPU.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_configItem=MULTI_DEVICE_PRIORITIES_NPU_.*)",
-                R"(.*OVInferRequestIOTensorTest.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_.*)",
-                R"(.*OVInferRequestIOTensorTest.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_configItem=MULTI_DEVICE_PRIORITIES_NPU_.*)",
-        });
+        // // [Tracking number: E#99817]
+        // _skipRegistry.addPatterns(
+        //         "NPU Plugin currently fails to get a valid output in these test cases", {
+        //         ".*OVInferRequestIOTensorTest.InferStaticNetworkSetChangedInputTensorThrow.*",
+        //         ".*OVInferRequestIOTensorTestNPU.InferStaticNetworkSetChangedInputTensorThrow.*",
+        //         R"(.*OVInferRequestIOTensorTestNPU.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_.*)",
+        //         R"(.*OVInferRequestIOTensorTestNPU.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_configItem=MULTI_DEVICE_PRIORITIES_NPU_.*)",
+        //         R"(.*OVInferRequestIOTensorTest.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_.*)",
+        //         R"(.*OVInferRequestIOTensorTest.InferStaticNetworkSetChangedInputTensorThrow/targetDevice=NPU3720_configItem=MULTI_DEVICE_PRIORITIES_NPU_.*)",
+        // });
 
         // [Track number: E#68774]
         _skipRegistry.addPatterns(
@@ -612,12 +612,12 @@ std::vector<std::string> disabledTestPatterns() {
                 ".*OVCheckSetSupportedRWMetricsPropsTests.ChangeCorrectProperties.*AUTO.*LOG_LEVEL.*"
         });
 
-        // [Tracking number: E#99817]
-        _skipRegistry.addPatterns(backendName.isZero() && devices.has3720(),
-                "Disabled tests for NPU3720", {
-                ".*InferRequestVariableStateTest.inferreq_smoke_VariableState_2infers.*",
-                ".*OVInferRequestIOTensorTest.*InferStaticNetworkSetChangedInputTensorThrow.*"
-        });
+        // // [Tracking number: E#99817]
+        // _skipRegistry.addPatterns(backendName.isZero() && devices.has3720(),
+        //         "Disabled tests for NPU3720", {
+        //         ".*InferRequestVariableStateTest.inferreq_smoke_VariableState_2infers.*",
+        //         ".*OVInferRequestIOTensorTest.*InferStaticNetworkSetChangedInputTensorThrow.*"
+        // });
 
         // [Tracking number: E#114903]
         _skipRegistry.addPatterns(devices.has3720(),
