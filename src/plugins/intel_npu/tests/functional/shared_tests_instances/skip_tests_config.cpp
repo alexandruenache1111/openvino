@@ -779,37 +779,37 @@ std::vector<std::string> disabledTestPatterns() {
                 ".*CoreThreadingTest.*CoreThreadingTestsWithCacheEnabled.*"
         });
 
-        // [Tracking number: E#118331]
-        _skipRegistry.addPatterns(backendName.isZero() && !devices.has3720(),
-                "platform and compiler_type are private", {
-                ".*smoke_Multi_BehaviorTests/OVInferRequestCallbackTests.*",
-                ".*smoke_Auto_BehaviorTests/OVInferRequestCallbackTests.*",
-                ".*smoke_Auto_BehaviorTests/OVInferRequestCallbackTestsNPU.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestCallbackTestsNPU.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestIOTensorTestNPU.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestIOTensorTest.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestMultithreadingTests.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestMultithreadingTestsNPU.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestPerfCountersExceptionTest.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestPerfCountersTest.*",
-                ".*smoke_Multi_BehaviorTests/OVInferRequestWaitTests.*",
-                ".*smoke_Auto_BehaviorTests/OVInferRequestMultithreadingTests.*",
-                ".*smoke_Auto_BehaviorTests/OVInferRequestMultithreadingTestsNPU.*",
-                ".*smoke_Auto_BehaviorTests/OVInferRequestPerfCountersExceptionTest.*",
-                ".*smoke_Auto_BehaviorTests/OVInferRequestPerfCountersTest.*",
-                ".*smoke_Auto_BehaviorTests/OVInferRequestWaitTests.*",
-                ".*smoke_OVClassNetworkTestP/OVClassNetworkTestPNPU.*",
-                ".*smoke_OVClassLoadNetworkTest/OVClassLoadNetworkTestNPU.*",
-                ".*smoke_Hetero_BehaviorTests_VariableState/OVInferRequestVariableStateTest.*"
-        });
+        // // [Tracking number: E#118331]
+        // _skipRegistry.addPatterns(backendName.isZero() && !devices.has3720(),
+        //         "platform and compiler_type are private", {
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestCallbackTests.*",
+        //         ".*smoke_Auto_BehaviorTests/OVInferRequestCallbackTests.*",
+        //         ".*smoke_Auto_BehaviorTests/OVInferRequestCallbackTestsNPU.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestCallbackTestsNPU.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestIOTensorTestNPU.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestIOTensorTest.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestMultithreadingTests.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestMultithreadingTestsNPU.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestPerfCountersExceptionTest.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestPerfCountersTest.*",
+        //         ".*smoke_Multi_BehaviorTests/OVInferRequestWaitTests.*",
+        //         ".*smoke_Auto_BehaviorTests/OVInferRequestMultithreadingTests.*",
+        //         ".*smoke_Auto_BehaviorTests/OVInferRequestMultithreadingTestsNPU.*",
+        //         ".*smoke_Auto_BehaviorTests/OVInferRequestPerfCountersExceptionTest.*",
+        //         ".*smoke_Auto_BehaviorTests/OVInferRequestPerfCountersTest.*",
+        //         ".*smoke_Auto_BehaviorTests/OVInferRequestWaitTests.*",
+        //         ".*smoke_OVClassNetworkTestP/OVClassNetworkTestPNPU.*",
+        //         ".*smoke_OVClassLoadNetworkTest/OVClassLoadNetworkTestNPU.*",
+        //         ".*smoke_Hetero_BehaviorTests_VariableState/OVInferRequestVariableStateTest.*"
+        // });
 
-        // [Tracking number: E#118331]
-        _skipRegistry.addPatterns(backendName.isZero(),
-                "Private properties cannot be accessed by HETERO compiled model", {
-                        ".*smoke_Hetero_BehaviorTests.*OVClassCompiledModelGetPropertyTest_MODEL_PRIORITY.*",
-                        ".*smoke_Hetero_BehaviorTests.*OVClassCompiledModelGetPropertyTest_EXEC_DEVICES.*",
-                        ".*smoke_Hetero_BehaviorTests.*OVCompileModelGetExecutionDeviceTests.*"
-        });
+        // // [Tracking number: E#118331]
+        // _skipRegistry.addPatterns(backendName.isZero(),
+        //         "Private properties cannot be accessed by HETERO compiled model", {
+        //                 ".*smoke_Hetero_BehaviorTests.*OVClassCompiledModelGetPropertyTest_MODEL_PRIORITY.*",
+        //                 ".*smoke_Hetero_BehaviorTests.*OVClassCompiledModelGetPropertyTest_EXEC_DEVICES.*",
+        //                 ".*smoke_Hetero_BehaviorTests.*OVCompileModelGetExecutionDeviceTests.*"
+        // });
 
         // [Tracking number: E#118331]
         _skipRegistry.addPatterns(backendName.isZero() && !devices.has3720(),
