@@ -193,7 +193,7 @@ TEST_P(OVInferRequestIOTensorTestNPU, InferStaticNetworkSetChangedInputTensorThr
     OV_ASSERT_NO_THROW(tensor = req.get_tensor(function->inputs().back().get_any_name()));
     // Set shape
     OV_ASSERT_NO_THROW(tensor.set_shape(shape2));
-    ASSERT_ANY_THROW(req.infer());
+    OV_ASSERT_NO_THROW(req.infer());
 }
 
 TEST_P(OVInferRequestIOTensorTestNPU, InferStaticNetworkSetChangedOutputTensorThrow) {
