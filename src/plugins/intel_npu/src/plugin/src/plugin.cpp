@@ -210,15 +210,6 @@ Plugin::Plugin()
     // parse again env_variables after backend is initialized to get backend proprieties
     _globalConfig.parseEnvVars();
 
-    // initialize properties which have device-tied default values in global config
-    // *only if there is a driver available
-    if (_metrics->GetAvailableDevicesNames().size() > 0) {
-        _globalConfig.update({{ov::intel_npu::stepping.name(),
-                               std::to_string(_metrics->GetSteppingNumber(get_specified_device_name(_globalConfig)))}});
-        _globalConfig.update({{ov::intel_npu::max_tiles.name(),
-                               std::to_string(_metrics->GetMaxTiles(get_specified_device_name(_globalConfig)))}});
-    }
-
     // Map from name to function {Config -> ov::Any}
     // Note that some properties are RW before network is loaded, and become RO after network is loaded
     _properties = {
@@ -449,14 +440,16 @@ Plugin::Plugin()
         {ov::intel_npu::stepping.name(),
          {false,
           ov::PropertyMutability::RW,
-          [](const Config& config) {
-              return config.get<STEPPING>();
+          [&](const Config& config) {
+              const auto specifiedDeviceName = get_specified_device_name(_globalConfig);
+              return _metrics->GetSteppingNumber(specifiedDeviceName);
           }}},
         {ov::intel_npu::max_tiles.name(),
          {false,
           ov::PropertyMutability::RW,
-          [](const Config& config) {
-              return config.get<MAX_TILES>();
+          [&](const Config& config) {
+              const auto specifiedDeviceName = get_specified_device_name(_globalConfig);
+              return _metrics->GetMaxTiles(specifiedDeviceName);
           }}},
         {ov::intel_npu::compilation_mode.name(),
          {false,
