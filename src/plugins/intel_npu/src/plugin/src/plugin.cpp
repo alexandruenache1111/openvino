@@ -442,14 +442,14 @@ Plugin::Plugin()
           ov::PropertyMutability::RW,
           [&](const Config& config) {
               const auto specifiedDeviceName = get_specified_device_name(_globalConfig);
-              return _metrics->GetSteppingNumber(specifiedDeviceName);
+              return std::string(_metrics->GetSteppingNumber(specifiedDeviceName));
           }}},
         {ov::intel_npu::max_tiles.name(),
          {false,
           ov::PropertyMutability::RW,
           [&](const Config& config) {
               const auto specifiedDeviceName = get_specified_device_name(_globalConfig);
-              return _metrics->GetMaxTiles(specifiedDeviceName);
+              return std::string(_metrics->GetMaxTiles(specifiedDeviceName));
           }}},
         {ov::intel_npu::compilation_mode.name(),
          {false,
