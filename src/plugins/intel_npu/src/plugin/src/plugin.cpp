@@ -441,15 +441,21 @@ Plugin::Plugin()
          {false,
           ov::PropertyMutability::RW,
           [&](const Config& config) {
-              const auto specifiedDeviceName = get_specified_device_name(config);
-              return std::to_string(_metrics->GetSteppingNumber(specifiedDeviceName));
+              if (!config.has<STEPPING>()) {
+                const auto specifiedDeviceName = get_specified_device_name(config);
+                return std::to_string(_metrics->GetSteppingNumber(specifiedDeviceName));
+              }
+              return config.get<STEPPING>();
           }}},
         {ov::intel_npu::max_tiles.name(),
          {false,
           ov::PropertyMutability::RW,
           [&](const Config& config) {
-              const auto specifiedDeviceName = get_specified_device_name(config);
-              return std::to_string(_metrics->GetMaxTiles(specifiedDeviceName));
+              if (!config.has<MAX_TILES>()) {
+                const auto specifiedDeviceName = get_specified_device_name(config);
+                return std::to_string(_metrics->GetMaxTiles(specifiedDeviceName));
+              }
+              return config.get<MAX_TILES>();
           }}},
         {ov::intel_npu::compilation_mode.name(),
          {false,
