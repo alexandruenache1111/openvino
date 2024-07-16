@@ -445,7 +445,7 @@ Plugin::Plugin()
                 const auto specifiedDeviceName = get_specified_device_name(config);
                 return std::to_string(_metrics->GetSteppingNumber(specifiedDeviceName));
               }
-              return config.get<STEPPING>();
+              return std::to_string(config.get<STEPPING>());
           }}},
         {ov::intel_npu::max_tiles.name(),
          {false,
@@ -455,7 +455,7 @@ Plugin::Plugin()
                 const auto specifiedDeviceName = get_specified_device_name(config);
                 return std::to_string(_metrics->GetMaxTiles(specifiedDeviceName));
               }
-              return config.get<MAX_TILES>();
+              return std::to_string(config.get<MAX_TILES>());
           }}},
         {ov::intel_npu::compilation_mode.name(),
          {false,
