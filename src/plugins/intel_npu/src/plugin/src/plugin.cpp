@@ -444,8 +444,9 @@ Plugin::Plugin()
               if (!config.has<STEPPING>()) {
                 const auto specifiedDeviceName = get_specified_device_name(config);
                 return static_cast<int64_t>(_metrics->GetSteppingNumber(specifiedDeviceName));
+              } else {
+                return config.get<STEPPING>();
               }
-              return config.get<STEPPING>();
           }}},
         {ov::intel_npu::max_tiles.name(),
          {false,
@@ -454,8 +455,9 @@ Plugin::Plugin()
               if (!config.has<MAX_TILES>()) {
                 const auto specifiedDeviceName = get_specified_device_name(config);
                 return static_cast<int64_t>(_metrics->GetMaxTiles(specifiedDeviceName));
+              } else {
+                return config.get<MAX_TILES>();
               }
-              return config.get<MAX_TILES>();
           }}},
         {ov::intel_npu::compilation_mode.name(),
          {false,
@@ -612,7 +614,8 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
     // Update stepping w/ information from driver, unless provided by user or we are off-device
     // Ignore, if compilation was requested for platform, different from current
     if (!localConfig.has<STEPPING>() && device != nullptr &&
-        device->getName() == ov::intel_npu::Platform::standardize(platform)) {
+        device->getName() == ov::intel_npu::Platform::standardize(platform) &&
+        _metrics->GetBackendName() == "level_zero") {
         try {
             localConfig.update({{ov::intel_npu::stepping.name(), std::to_string(device->getSubDevId())}});
         } catch (...) {
@@ -623,7 +626,8 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
     // Update max_tiles w/ information from driver, unless provided by user or we are off-device
     // Ignore, if compilation was requested for platform, different from current
     if (!localConfig.has<MAX_TILES>() && device != nullptr &&
-        device->getName() == ov::intel_npu::Platform::standardize(platform)) {
+        device->getName() == ov::intel_npu::Platform::standardize(platform) &&
+        _metrics->GetBackendName() == "level_zero") {
         try {
             localConfig.update({{ov::intel_npu::max_tiles.name(), std::to_string(device->getMaxNumSlices())}});
         } catch (...) {
