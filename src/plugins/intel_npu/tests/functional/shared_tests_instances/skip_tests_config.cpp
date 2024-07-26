@@ -587,8 +587,6 @@ std::vector<std::string> disabledTestPatterns() {
                 ".*smoke_BehaviorTests_OVClassImportExportTestP/OVClassCompiledModelImportExportTestP.smoke_ImportNetworkThrowWithDeviceName.*",
                 ".*ClassExecutableNetworkTestSuite1NPU.PropertyIsSupportedAndImmutableAndGet.*",
                 ".*ClassExecutableNetworkTestSuite2NPU.PropertyIsSupportedAndImmutableAndCanNotSet.*",
-                ".*smoke_BehaviorTests_ClassPluginPropertiesTest/ClassPluginPropertiesTestSuite2NPU.CanNotSetImmutableProperty.*",
-                ".*smoke_BehaviorTests_ClassPluginPropertiesOptsTest1NPU/ClassPluginPropertiesTestSuite3NPU.CanGetPropertyWithOptionsNotAffectingCore.*",
                 ".*ClassPluginPropertiesTestSuite4NPU.CanNotSetGetInexistentProperty.*",
                 ".*BehaviorTests_OVCheckSetSupportedRWMandatoryMetricsPropsTests/OVCheckSetSupportedRWMetricsPropsTests.ChangeCorrectProperties.*"
         });
@@ -668,25 +666,19 @@ std::vector<std::string> disabledTestPatterns() {
                                   {".*CompiledKernelsCacheTest.*CanCreateCacheDirAndDumpBinariesUnicodePath.*"});
 #endif
 
-        // // [Tracking number: E#108600]
-        // _skipRegistry.addPatterns(backendName.isZero(),
-        //         "Unsupported NPU properties", {
-        //         ".*OVCheckSetSupportedRWMetricsPropsTests.ChangeCorrectProperties.*EXECUTION_MODE_HINT.*",
-        //         ".*OVCheckChangePropComplieModleGetPropTests_InferencePrecision.*",
-        //         ".*OVCheckMetricsPropsTests_ModelDependceProps.*",
-        //         ".*OVCheckChangePropComplieModleGetPropTests_DEVICE_ID.*ENABLE_CPU_PINNING.*",
-        //         ".*OVClassCompileModelAndCheckSecondaryPropertiesTest.*"
-        // });
+        // [Tracking number: E#108600]
+        _skipRegistry.addPatterns(backendName.isZero(),
+                "Unsupported NPU properties", {
+                ".*OVCheckMetricsPropsTests_ModelDependceProps.*",
+                ".*OVClassCompileModelAndCheckSecondaryPropertiesTest.*"
+        });
 
-        // // [Tracking number: E#108600]
-        // _skipRegistry.addPatterns(backendName.isZero(),
-        //         "Failing properties tests", {
-        //         ".*OVSpecificDeviceSetConfigTest.GetConfigSpecificDeviceNoThrow.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*DEVICE_ID.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*NPU_COMPILATION_MODE.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*NPU_COMPILATION_MODE_PARAMS.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*NPU_PROFILING_OUTPUT_FILE.*"
-        // });
+        // [Tracking number: E#108600]
+        _skipRegistry.addPatterns(backendName.isZero(),
+                "Failing properties tests", {
+                ".*OVSpecificDeviceSetConfigTest.GetConfigSpecificDeviceNoThrow.*",
+                ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*DEVICE_ID.*",
+        });
 
         // [Tracking number: E#109040]
         _skipRegistry.addPatterns("Disabled all tests CompileForDifferentPlatformsTests with config NPU_COMPILER_TYPE_DRIVER", {
@@ -763,15 +755,12 @@ std::vector<std::string> disabledTestPatterns() {
                 ".*CoreThreadingTestsWithIter.nightly_AsyncInfer_ShareInput.*"
         });
 
-        // // [Tracking number: E#108600]
-        // _skipRegistry.addPatterns(backendName.isZero(),
-        //         "Failing properties tests", {
-        //         ".*OVSpecificDeviceSetConfigTest.GetConfigSpecificDeviceNoThrow.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*DEVICE_ID.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*NPU_COMPILATION_MODE.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*NPU_COMPILATION_MODE_PARAMS.*",
-        //         ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*NPU_PROFILING_OUTPUT_FILE.*"
-        // });
+        // [Tracking number: E#108600]
+        _skipRegistry.addPatterns(backendName.isZero(),
+                "Failing properties tests", {
+                ".*OVSpecificDeviceSetConfigTest.GetConfigSpecificDeviceNoThrow.*",
+                ".*OVPropertiesIncorrectTests.SetPropertiesWithIncorrectKey.*DEVICE_ID.*",
+        });
 
         // [Tracking number: E#117582]
         _skipRegistry.addPatterns(backendName.isZero(),
