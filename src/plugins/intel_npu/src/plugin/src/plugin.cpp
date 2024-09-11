@@ -228,6 +228,18 @@ Plugin::Plugin()
     OV_ITT_TASK_NEXT(PLUGIN, "Metrics");
     _metrics = std::make_unique<Metrics>(_backends);
 
+    int i = -1;
+    unsigned int j = 1;
+    if(i < j) {std::cout << "a";}
+    j--;j--;
+    j = i;
+    int k;
+    std::cout << k << '\n';
+    int z = 3.14;
+    int *p_z;
+    float *p_c;
+    if(p_z == p_c) {std::cout << "something\n";}
+
     // parse again env_variables after backend is initialized to get backend proprieties
     _globalConfig.parseEnvVars();
 
