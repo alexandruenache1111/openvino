@@ -10,7 +10,7 @@ endif()
 # Warnings as errors
 #
 
-macro(remove_compiler_flag FLAGS)
+macro(remove_compiler_flags FLAGS)
     string(REPLACE " " ";" _tokened_list "${FLAGS}")
     foreach(flag IN LISTS _tokened_list)
         string(REPLACE "${flag}" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -20,10 +20,8 @@ macro(remove_compiler_flag FLAGS)
     endforeach()
 endmacro()
 
-set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
-
 if(CMAKE_COMPILE_WARNING_AS_ERROR)
-    remove_compiler_flag("${ov_c_cxx_deprecated_no_errors}")
+    remove_compiler_flags(-Wno-error=deprecated-declarations)
     if(CMAKE_CXX_COMPILER_ID STREQUAL GNU OR CMAKE_CXX_COMPILER_ID STREQUAL Clang)
         ov_add_compiler_flags(-Werror)
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
