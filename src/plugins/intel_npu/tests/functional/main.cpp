@@ -36,7 +36,6 @@ int main(int argc, char** argv, char** envp) {
     }
     oss << std::endl;
 
-    oss << "Process id: " << getpid() << std::endl;
 #   ifdef WIN32
         oss << "Process id: " << _getpid() << std::endl;
 #   else
