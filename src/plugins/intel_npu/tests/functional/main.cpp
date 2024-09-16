@@ -3,6 +3,9 @@
 //
 
 #include <signal.h>
+#ifdef WIN32
+#include <process.h>
+#endif
 #include <functional_test_utils/summary/op_summary.hpp>
 #include <iostream>
 #include <sstream>
@@ -11,26 +14,21 @@
 #include "npu_private_properties.hpp"
 #include "npu_test_report.hpp"
 #include "npu_test_tool.hpp"
-
 namespace testing {
 namespace internal {
 extern bool g_help_flag;
 }  // namespace internal
 }  // namespace testing
-
 void sigsegv_handler(int errCode);
-
 void sigsegv_handler(int errCode) {
     auto& s = ov::test::utils::OpSummary::getInstance();
     s.saveReport();
     std::cerr << "Unexpected application crash with code: " << errCode << std::endl;
     std::abort();
 }
-
 int main(int argc, char** argv, char** envp) {
     // register crashHandler for SIGSEGV signal
     signal(SIGSEGV, sigsegv_handler);
-
     std::ostringstream oss;
     oss << "Command line args (" << argc << "): ";
     for (int c = 0; c < argc; ++c) {
@@ -39,6 +37,12 @@ int main(int argc, char** argv, char** envp) {
     oss << std::endl;
 
     oss << "Process id: " << getpid() << std::endl;
+#   ifdef WIN32
+        oss << "Process id: " << _getpid() << std::endl;
+#   else
+        oss << "Process id: " << getpid() << std::endl;
+#   endif
+
     std::cout << oss.str();
     oss.str("");
 
