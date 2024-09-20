@@ -783,9 +783,14 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         }
         _logger.debug("Successfully read %zu bytes into blob.", graphSize);
 
+        auto storedMeta = read_metadata_from(blob);
+        if (!storedMeta->isCompatible()) {
+            OPENVINO_THROW("Incompatible blob metadata version!");
+        }
+
         auto graph = compiler->parse(std::move(blob), localConfig);
         graph->update_network_name("net" + std::to_string(_compiledModelLoadCounter++));
-
+        
         const std::shared_ptr<ov::Model> modelDummy =
             create_dummy_model(graph->get_metadata().inputs, graph->get_metadata().outputs);
 

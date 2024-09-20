@@ -18,6 +18,7 @@
 #include "openvino/runtime/properties.hpp"
 #include "openvino/runtime/system_conf.hpp"
 #include "openvino/runtime/threading/executor_manager.hpp"
+#include "openvino/util/common_util.hpp"
 #include "transformations/utils/utils.hpp"
 
 namespace intel_npu {
@@ -74,6 +75,12 @@ std::shared_ptr<ov::ISyncInferRequest> CompiledModel::create_sync_infer_request(
 void CompiledModel::export_model(std::ostream& stream) const {
     _logger.debug("CompiledModel::export_model");
     _graph->export_blob(stream);
+
+    auto meta = Metadata<CURRENT_METAVERSION_MAJOR, CURRENT_METAVERSION_MINOR>();
+    meta.write(stream);
+    // should we move this inside meta.write()?
+    size_t blobSizeBeforeVersioning = blob.size();
+    stream.write(reinterpret_cast<const char*>(&blobSizeBeforeVersioning), sizeof(blobSizeBeforeVersioning));
 }
 
 std::shared_ptr<const ov::Model> CompiledModel::get_runtime_model() const {
