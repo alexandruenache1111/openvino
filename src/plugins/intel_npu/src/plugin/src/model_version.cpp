@@ -35,6 +35,7 @@ void check_blob_version(std::vector<uint8_t>& blob, std::istream& stream) {
     metadataIterator = blob.begin() + blobDataSize;
 
     char* blobVersionHeader = new char[versionHeader.size() + 1];
+    blobVersionHeader[versionHeader.size()] = '\n';
     std::copy(metadataIterator, metadataIterator + versionHeader.size(), blobVersionHeader);
     std::cout << "header: " << blobVersionHeader << '\n';
 
