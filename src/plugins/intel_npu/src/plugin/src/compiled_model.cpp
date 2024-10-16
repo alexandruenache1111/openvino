@@ -152,7 +152,7 @@ void CompiledModel::export_model(std::ostream& stream) const {
     std::cout << "meta version sizes: " << metaVersion.major << " " << metaVersion.minor << '\n';
     OpenvinoVersion ovVersion = {"2024.5.0-16678-090da7b5376-blob_commit"};
     std::cout << "ovversion size: " << ovVersion.version.size() << '\n';
-    ModelLayout layout = {.something = 643, .somethingElse = 68.643};
+    ModelLayout layout = {643, 68.643};
 
     Metadata_v1 metav1 = {metaVersion, ovVersion};
     Metadata_v2 metav2 = {metaVersion, ovVersion, layout};
