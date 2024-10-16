@@ -23,7 +23,7 @@ std::vector<uint8_t> Metadata_v1::data() {
 
 // actually what should it return?
 void check_blob_version(std::vector<uint8_t>& blob, std::istream& stream) {
-    const std::string_view versionHeader{"OVNPU"}; // maybe put this some place else
+    constexpr std::string_view versionHeader{"OVNPU"}; // maybe put this some place else
 
     size_t blobDataSize; // blob size *WITHOUT* metadata part
     auto metadataIterator {blob.end() - sizeof(size_t)};
@@ -41,8 +41,7 @@ void check_blob_version(std::vector<uint8_t>& blob, std::istream& stream) {
 
     // should we consider the header name changes?
     // if so, we might need multiple header #defines
-    if (versionHeader.compare(blobVersionHeader)) {
-        std::cout << "version header: " << versionHeader << "blobversion header: " << blobVersionHeader << '\n';
+    if (!versionHeader.compare(blobVersionHeader)) {
         OPENVINO_THROW("Version header mismatch or missing");
     }
     metadataIterator += versionHeader.size();
