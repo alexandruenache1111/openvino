@@ -48,6 +48,7 @@ jobs:
 
   Docker:
     needs: Smart_CI
+    if: "!needs.smart_ci.outputs.skip_workflow"
     runs-on: aks-linux-16-cores-arm-docker-build
     container:
       image: openvinogithubactions.azurecr.io/docker_build:0.2
@@ -82,6 +83,7 @@ jobs:
       build-js: false
       build-debian-packages: false
       build-contrib: false
+      build-rpm-packages: false
       cmake-options: |-
         -DCMAKE_TOOLCHAIN_FILE=${OPENVINO_REPO}/cmake/arm.toolchain.cmake \
         -DTHREADS_PTHREAD_ARG="-pthread" \
