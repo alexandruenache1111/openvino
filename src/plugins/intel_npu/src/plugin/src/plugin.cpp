@@ -19,7 +19,6 @@
 #include "openvino/op/parameter.hpp"
 #include "openvino/runtime/intel_npu/properties.hpp"
 #include "openvino/runtime/properties.hpp"
-#include "openvino/util/common_util.hpp"
 #include "remote_context.hpp"
 
 
