@@ -761,7 +761,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         _logger.debug("Successfully read %zu bytes into blob.", graphSize);
 
         auto storedMeta = read_metadata_from(blob);
-        if (!storedMeta->isCompatible()) {
+
+        if (storedMeta == nullptr) {
+            OPENVINO_THROW("Couldn't read blob version.");
+        } else if (!storedMeta->isCompatible()) {
+            // _logger.info print for storedMeta members or should it always be printed with std::cout?
             OPENVINO_THROW("Incompatible blob metadata version!");
         }
 

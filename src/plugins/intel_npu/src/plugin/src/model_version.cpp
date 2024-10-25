@@ -7,6 +7,7 @@
 #include <cstring>
 #include <sstream>
 
+#include "intel_npu/utils/logger/logger.hpp"
 #include "openvino/core/version.hpp"
 
 namespace intel_npu {
@@ -41,11 +42,11 @@ std::unique_ptr<MetadataBase> createMetadata(int major, int minor) {
     switch (major) {
     case 1:
         switch (minor) {
-            case 0:
-                return std::make_unique<Metadata<1, 0>>();
+        case 0:
+            return std::make_unique<Metadata<1, 0>>();
 
-            default:
-                return nullptr;
+        default:
+            return nullptr;
         }
 
     default:
@@ -55,7 +56,8 @@ std::unique_ptr<MetadataBase> createMetadata(int major, int minor) {
 
 bool Metadata<1, 0>::isCompatible() {
     // checking if we still support the format
-    if (version.major != CURRENT_METAVERSION_MAJOR) {
+    // but is checking `Major` redundant since it's checked in createMetadata?
+    if (version.major != CURRENT_METAVERSION_MAJOR || version.minor != CURRENT_METAVERSION_MINOR) {
         return false;
     }
     // checking if we can import the blob
@@ -63,11 +65,13 @@ bool Metadata<1, 0>::isCompatible() {
 }
 
 std::unique_ptr<MetadataBase> read_metadata_from(std::vector<uint8_t>& blob) {
+    Logger _logger("NPUPlugin", Logger::global().level());
     size_t blobDataSize;
     auto metadataIterator = blob.end() - sizeof(blobDataSize);
     memcpy(&blobDataSize, &(*metadataIterator), sizeof(blobDataSize));
     if (blobDataSize >= blob.size() - sizeof(blobDataSize)) {
-        // OPENVINO_THROW("Imported blob is not versioned!");
+        _logger.error("Imported blob is not versioned!");
+        return nullptr;
     }
 
     metadataIterator = blob.begin() + blobDataSize;
@@ -78,7 +82,8 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::vector<uint8_t>& blob) {
     std::string blobVersionHeader(DELIMITER.size(), '\0');
     metadataStream.read(&blobVersionHeader[0], DELIMITER.size());
     if (DELIMITER != blobVersionHeader) {
-        // OPENVINO_THROW("Version header mismatch or missing!");
+        _logger.error("Version header mismatch or missing!");
+        return nullptr;
     }
 
     MetadataVersion metaVersion;
