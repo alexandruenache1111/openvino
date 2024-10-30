@@ -29,8 +29,6 @@ void Metadata<1, 0>::read(std::istream& stream) {
 }
 
 void Metadata<1, 0>::write(std::ostream& stream) {
-    stream.write(DELIMITER.data(), DELIMITER.size());
-
     stream.write(reinterpret_cast<const char*>(&version.major), sizeof(version.major));
     stream.write(reinterpret_cast<const char*>(&version.minor), sizeof(version.minor));
 
@@ -66,25 +64,24 @@ bool Metadata<1, 0>::isCompatible() {
 
 std::unique_ptr<MetadataBase> read_metadata_from(std::vector<uint8_t>& blob) {
     Logger _logger("NPUPlugin", Logger::global().level());
-    size_t blobDataSize;
-    auto metadataIterator = blob.end() - sizeof(blobDataSize);
-    memcpy(&blobDataSize, &(*metadataIterator), sizeof(blobDataSize));
-    if (blobDataSize >= blob.size() - sizeof(blobDataSize)) {
-        _logger.error("Imported blob is not versioned!");
+    size_t delimiterSize = DELIMITER.size();
+    std::string blobVersionHeader(delimiterSize, '\0');
+
+    auto metadataIterator = blob.end() - delimiterSize;
+    memcpy(blobVersionHeader.data(), &(*metadataIterator), delimiterSize);
+    if (DELIMITER != blobVersionHeader) {
+        _logger.error("Blob is not versioned");
         return nullptr;
     }
+
+    size_t blobDataSize;
+    metadataIterator -= sizeof(blobDataSize);
+    memcpy(&blobDataSize, &(*metadataIterator), sizeof(blobDataSize));
 
     metadataIterator = blob.begin() + blobDataSize;
     std::stringstream metadataStream;
     metadataStream.write(reinterpret_cast<const char*>(&(*metadataIterator)),
                          blob.end() - metadataIterator - sizeof(blobDataSize));
-
-    std::string blobVersionHeader(DELIMITER.size(), '\0');
-    metadataStream.read(&blobVersionHeader[0], DELIMITER.size());
-    if (DELIMITER != blobVersionHeader) {
-        _logger.error("Version header mismatch or missing!");
-        return nullptr;
-    }
 
     MetadataVersion metaVersion;
     metadataStream.read(reinterpret_cast<char*>(&metaVersion.major), sizeof(metaVersion.major));

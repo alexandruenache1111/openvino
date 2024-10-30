@@ -158,6 +158,8 @@ void CompiledModel::export_model(std::ostream& stream) const {
     size_t blobSizeBeforeVersioning = blob.size();
     stream.write(reinterpret_cast<const char*>(&blobSizeBeforeVersioning), sizeof(blobSizeBeforeVersioning));
 
+    stream.write(DELIMITER.data(), DELIMITER.size());
+
     std::stringstream str;
     str << "Blob size: " << blob.size() << ", hash: " << std::hex << hash(blob);
     _logger.info(str.str().c_str());
