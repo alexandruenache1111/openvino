@@ -13,6 +13,7 @@
 #include "intel_npu/config/common.hpp"
 #include "intel_npu/config/compiler.hpp"
 #include "intel_npu/config/npuw.hpp"
+#include "model_version.hpp"
 #include "intel_npu/config/runtime.hpp"
 #include "npuw/compiled_model.hpp"
 #include "openvino/op/constant.hpp"

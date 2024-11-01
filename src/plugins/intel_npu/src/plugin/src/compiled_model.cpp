@@ -13,6 +13,7 @@
 #include "intel_npu/config/compiler.hpp"
 #include "intel_npu/config/config.hpp"
 #include "intel_npu/config/runtime.hpp"
+#include "model_version.hpp"
 #include "intel_npu/icompiler.hpp"
 #include "openvino/pass/constant_folding.hpp"
 #include "openvino/pass/manager.hpp"
@@ -150,19 +151,15 @@ std::shared_ptr<ov::ISyncInferRequest> CompiledModel::create_sync_infer_request(
 
 void CompiledModel::export_model(std::ostream& stream) const {
     _logger.debug("CompiledModel::export_model");
-    const auto&& blob = _compiler->getCompiledNetwork(_networkPtr);
-    stream.write(reinterpret_cast<const char*>(blob.data()), blob.size());
+    const auto blob = _compiler->getCompiledNetwork(*_networkPtr);
+    stream.write(reinterpret_cast<const char*>(blob.data), blob.size);
 
     auto meta = Metadata<CURRENT_METAVERSION_MAJOR, CURRENT_METAVERSION_MINOR>();
     meta.write(stream);
-    size_t blobSizeBeforeVersioning = blob.size();
+    size_t blobSizeBeforeVersioning = blob.size;
     stream.write(reinterpret_cast<const char*>(&blobSizeBeforeVersioning), sizeof(blobSizeBeforeVersioning));
 
     stream.write(DELIMITER.data(), DELIMITER.size());
-
-    std::stringstream str;
-    str << "Blob size: " << blob.size() << ", hash: " << std::hex << hash(blob);
-    _logger.info(str.str().c_str());
 
     if (!stream) {
         _logger.error("Write blob to stream failed. Blob is broken!");
