@@ -14,6 +14,7 @@
 #include "intel_npu/config/common.hpp"
 #include "intel_npu/config/compiler.hpp"
 #include "intel_npu/config/npuw.hpp"
+#include "model_version.hpp"
 #include "intel_npu/config/runtime.hpp"
 #include "intel_npu/utils/zero/zero_init.hpp"
 #include "npuw/compiled_model.hpp"
@@ -784,7 +785,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         _logger.debug("Successfully read %zu bytes into blob.", graphSize);
 
         auto storedMeta = read_metadata_from(blob);
-        if (!storedMeta->isCompatible()) {
+
+        if (storedMeta == nullptr) {
+            OPENVINO_THROW("Couldn't read blob version.");
+        } else if (!storedMeta->isCompatible()) {
+            // _logger.info print for storedMeta members or use std::cout?
             OPENVINO_THROW("Incompatible blob metadata version!");
         }
 
