@@ -4,7 +4,6 @@
 
 #include "compiled_model.hpp"
 
-#include <fstream>
 #include <string_view>
 
 #include "async_infer_request.hpp"
@@ -14,13 +13,8 @@
 #include "intel_npu/config/config.hpp"
 #include "intel_npu/config/runtime.hpp"
 #include "model_version.hpp"
-#include "openvino/pass/constant_folding.hpp"
-#include "openvino/pass/manager.hpp"
 #include "openvino/runtime/properties.hpp"
-#include "openvino/runtime/system_conf.hpp"
 #include "openvino/runtime/threading/executor_manager.hpp"
-#include "openvino/util/common_util.hpp"
-#include "transformations/utils/utils.hpp"
 
 namespace intel_npu {
 

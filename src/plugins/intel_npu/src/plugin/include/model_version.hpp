@@ -12,7 +12,7 @@ namespace intel_npu {
 
 constexpr std::string_view MAGIC_BYTES = "OVNPU";
 
-constexpr int CURRENT_METAVERSION_MAJOR = 1;
+constexpr int CURRENT_METAVERSION_MAJOR = 2;
 constexpr int CURRENT_METAVERSION_MINOR = 0;
 
 struct MetadataVersion {
@@ -40,8 +40,9 @@ template <int Major, int Minor>
 struct Metadata : public MetadataBase {};
 
 template <>
-struct Metadata<1, 0> : public MetadataBase {
+struct Metadata<2, 0> : public MetadataBase {
     MetadataVersion version;
+    double dummy_extra;
     OpenvinoVersion ovVersion;
 
     Metadata();
