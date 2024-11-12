@@ -24,9 +24,20 @@ void OpenvinoVersion::read(std::istream& stream) {
 
 Metadata<2, 0>::Metadata() : version{2, 0}, ovVersion{ov::get_openvino_version().buildNumber} {}
 
+Metadata<2, 1>::Metadata() : Metadata<2, 0>() {
+    // we need a constructor for MetadataVersion
+    version.major = 2;
+    version.minor = 1;
+}
+
 void Metadata<2, 0>::read(std::istream& stream) {
     stream.read(reinterpret_cast<char*>(&dummy_extra), sizeof(dummy_extra));
     ovVersion.read(stream);
+}
+
+void Metadata<2, 1>::read(std::istream& stream) {
+    Metadata<2, 0>::read(stream);
+    stream.read(reinterpret_cast<char*>(&another_dummy), sizeof(another_dummy));
 }
 
 void Metadata<2, 0>::write(std::ostream& stream) {
@@ -39,12 +50,20 @@ void Metadata<2, 0>::write(std::ostream& stream) {
     stream.write(ovVersion.version.c_str(), ovVersion.version.size());
 }
 
+void Metadata<2, 1>::write(std::ostream& stream) {
+    Metadata<2, 0>::write(stream);
+    stream.write(reinterpret_cast<const char*>(&another_dummy), sizeof(another_dummy));
+}
+
 std::unique_ptr<MetadataBase> createMetadata(int major, int minor) {
     switch (major) {
     case 2:
         switch (minor) {
         case 0:
             return std::make_unique<Metadata<2, 0>>();
+
+        case 1:
+            return std::make_unique<Metadata<2, 1>>();
 
         default:
             return nullptr;
@@ -55,7 +74,9 @@ std::unique_ptr<MetadataBase> createMetadata(int major, int minor) {
     }
 }
 
-bool Metadata<2, 0>::isCompatible() {
+bool Metadata<2, 0>::isCompatible() { return false;}
+
+bool Metadata<2, 1>::isCompatible() {
     // checking if we still support the format
     // but is checking `Major` redundant since it's checked in createMetadata?
     if (version.major != CURRENT_METAVERSION_MAJOR || version.minor != CURRENT_METAVERSION_MINOR) {

@@ -13,7 +13,7 @@ namespace intel_npu {
 constexpr std::string_view MAGIC_BYTES = "OVNPU";
 
 constexpr int CURRENT_METAVERSION_MAJOR = 2;
-constexpr int CURRENT_METAVERSION_MINOR = 0;
+constexpr int CURRENT_METAVERSION_MINOR = 1;
 
 struct MetadataVersion {
     uint32_t major;
@@ -46,6 +46,23 @@ struct Metadata<2, 0> : public MetadataBase {
     OpenvinoVersion ovVersion;
 
     Metadata();
+
+    ~Metadata() = default;
+
+    void read(std::istream& stream) override;
+
+    void write(std::ostream& stream) override;
+
+    bool isCompatible() override;
+};
+
+template <>
+struct Metadata<2, 1> : public Metadata<2, 0> {
+    uint64_t another_dummy;
+
+    Metadata();
+
+    ~Metadata() = default;
 
     void read(std::istream& stream) override;
 
