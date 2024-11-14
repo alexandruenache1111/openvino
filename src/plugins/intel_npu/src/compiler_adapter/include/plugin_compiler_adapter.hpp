@@ -17,7 +17,7 @@ namespace intel_npu {
 
 class PluginCompilerAdapter final : public ICompilerAdapter {
 public:
-    PluginCompilerAdapter(const std::shared_ptr<ZeroInitStructsHolder>& zeroInitStruct, ov::intel_npu::CompilerType compilerType);
+    PluginCompilerAdapter(const std::shared_ptr<ZeroInitStructsHolder>& zeroInitStruct);
 
     std::shared_ptr<IGraph> compile(const std::shared_ptr<const ov::Model>& model, const Config& config) const override;
 
@@ -28,6 +28,10 @@ public:
     }
 
     ov::SupportedOpsMap query(const std::shared_ptr<const ov::Model>& model, const Config& config) const override;
+
+    ov::intel_npu::CompilerType getCompilerType() const override {
+        return ov::intel_npu::CompilerType::MLIR;
+    }
 
 private:
     std::shared_ptr<ZeroInitStructsHolder> _zeroInitStruct;
