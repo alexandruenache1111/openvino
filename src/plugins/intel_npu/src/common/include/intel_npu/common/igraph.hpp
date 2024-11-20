@@ -22,7 +22,7 @@ public:
     IGraph(ze_graph_handle_t handle,
            NetworkMetadata metadata,
            const Config& config,
-           std::optional<std::unique_ptr<BlobContainer>> blob);
+           std::optional<std::unique_ptr<BlobContainer>> blobPtr);
 
     virtual void export_blob(std::ostream& stream) = 0;
 
