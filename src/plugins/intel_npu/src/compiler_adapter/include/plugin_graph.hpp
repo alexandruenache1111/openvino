@@ -26,7 +26,7 @@ public:
                 std::vector<uint8_t> blob,
                 const Config& config);
 
-    void export_blob(std::ostream& stream) const override;
+    void export_blob(std::ostream& stream) override;
 
     std::vector<ov::ProfilingInfo> process_profiling_output(const std::vector<uint8_t>& profData,
                                                             const Config& config) const override;

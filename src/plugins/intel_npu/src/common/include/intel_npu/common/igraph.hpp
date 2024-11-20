@@ -12,6 +12,7 @@
 #include "intel_npu/utils/zero/zero_init.hpp"
 #include "intel_npu/utils/zero/zero_utils.hpp"
 #include "intel_npu/utils/zero/zero_wrappers.hpp"
+#include "openvino/runtime/aligned_buffer.hpp"
 #include "openvino/runtime/profiling_info.hpp"
 
 namespace intel_npu {
@@ -21,9 +22,9 @@ public:
     IGraph(ze_graph_handle_t handle,
            NetworkMetadata metadata,
            const Config& config,
-           std::optional<std::vector<uint8_t>> blob);
+           std::optional<std::unique_ptr<BlobContainer>> blob);
 
-    virtual void export_blob(std::ostream& stream) const = 0;
+    virtual void export_blob(std::ostream& stream) = 0;
 
     virtual std::vector<ov::ProfilingInfo> process_profiling_output(const std::vector<uint8_t>& profData,
                                                                     const Config& config) const = 0;
@@ -89,6 +90,7 @@ protected:
     // first inference starts running
     std::mutex _mutex;
 
+<<<<<<< HEAD
     std::vector<uint8_t> _blob;
 
     uint32_t _unique_id = 0;
@@ -101,6 +103,9 @@ protected:
     std::optional<std::size_t> _batch_size = std::nullopt;
 
     Logger _logger;
+=======
+    std::shared_ptr<ov::AlignedBuffer> _blob;
+>>>>>>> 25b5c05976 (Keep `shared_ptr` of blob in IGraph to fix `export_model` for import scenario)
 };
 
 }  // namespace intel_npu
