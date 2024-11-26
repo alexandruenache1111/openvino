@@ -31,7 +31,7 @@ class ModelDeserializer {
 public:
     typedef std::function<std::shared_ptr<ov::Model>(const std::shared_ptr<ov::AlignedBuffer>&, const std::shared_ptr<ov::AlignedBuffer>&)> ModelBuilder;
 
-    ModelDeserializer(std::istream& model,
+    ModelDeserializer(std::istream& model_stream,
                       std::shared_ptr<ov::AlignedBuffer> model_buffer,
                       ModelBuilder fn,
                       const CacheDecrypt& encrypt_fn,
@@ -44,7 +44,7 @@ public:
 protected:
     static void set_info(pugi::xml_node& root, std::shared_ptr<ov::Model>& model);
 
-    void process_mmap(std::shared_ptr<ov::Model>& model, const std::shared_ptr<ov::AlignedBuffer>& memory);
+    void process_mmap(const std::shared_ptr<ov::AlignedBuffer>& memory);
 
     void process_stream(std::shared_ptr<ov::Model>& model);
 

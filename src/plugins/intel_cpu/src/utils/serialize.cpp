@@ -47,14 +47,13 @@ ModelDeserializer::ModelDeserializer(std::istream& model_stream,
 
     void ModelDeserializer::operator>>(std::shared_ptr<ov::Model>& model) {
         if (m_model_buffer) {
-            process_mmap(model, m_model_buffer);
+            process_mmap(m_model_buffer);
         } else {
             process_stream(model);
         }
 }
 
-void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
-                                     const std::shared_ptr<ov::AlignedBuffer>& mmemory) {
+void ModelDeserializer::process_mmap(const std::shared_ptr<ov::AlignedBuffer>& mmemory) {
     // Note: Don't use seekg with mmaped stream. This may affect the performance of some models.
     // Get file size before seek content.
     // Blob from cache may have other header, so need to skip this.
@@ -107,7 +106,7 @@ void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
                                                                              hdr.model_size,
                                                                              xml_buff);
 
-    model = m_model_builder(model_buf, weights_buf);
+    auto model = m_model_builder(model_buf, weights_buf);
 
     // Set Info
     pugi::xml_node root = xml_in_out_doc.child("cnndata");
