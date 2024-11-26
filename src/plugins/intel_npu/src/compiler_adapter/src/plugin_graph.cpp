@@ -31,7 +31,7 @@ PluginGraph::PluginGraph(const std::shared_ptr<ZeGraphExtWrappers>& zeGraphExt,
     initialize(config);
 }
 
-void PluginGraph::export_blob(std::ostream& stream) {
+void PluginGraph::export_blob(std::ostream& stream) const {
     stream.write(reinterpret_cast<const char*>(_blob->get_ptr()), _blob->size());
 
     if (!stream) {

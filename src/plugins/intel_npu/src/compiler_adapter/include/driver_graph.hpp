@@ -24,7 +24,7 @@ public:
                 const Config& config,
                 std::optional<std::shared_ptr<ov::AlignedBuffer>> blob);
 
-    void export_blob(std::ostream& stream) override;
+    void export_blob(std::ostream& stream) const override;
 
     std::vector<ov::ProfilingInfo> process_profiling_output(const std::vector<uint8_t>& profData,
                                                             const Config& config) const override;
@@ -36,10 +36,16 @@ public:
     ~DriverGraph() override;
 
 private:
+    bool release_blob(const Config& config);
+
     std::shared_ptr<ZeGraphExtWrappers> _zeGraphExt;
     std::shared_ptr<ZeroInitStructsHolder> _zeroInitStruct;
 
     Logger _logger;
+
+    // In the case of the import path, the blob is released after graph initialization so it can not be any longer
+    // exported
+    bool _blobIsReleased = false;
 };
 
 }  // namespace intel_npu

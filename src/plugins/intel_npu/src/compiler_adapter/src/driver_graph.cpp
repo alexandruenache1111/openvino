@@ -32,17 +32,18 @@ DriverGraph::DriverGraph(const std::shared_ptr<ZeGraphExtWrappers>& zeGraphExt,
     initialize(config);
 }
 
-void DriverGraph::export_blob(std::ostream& stream) {
-    if (_blob.get() == nullptr) {
-        const uint8_t* blobPtr = nullptr;
-        size_t blobSize = -1;
-        std::shared_ptr<std::vector<uint8_t>> blob;
+void DriverGraph::export_blob(std::ostream& stream) const {
+    const uint8_t* blobPtr = nullptr;
+    size_t blobSize = -1;
+    std::vector<uint8_t> blob;
 
-        _zeGraphExt->getGraphBinary(_handle, *blob, blobPtr, blobSize);
-        _blob = std::make_shared<ov::SharedBuffer<std::shared_ptr<std::vector<uint8_t>>>>(reinterpret_cast<char*>(const_cast<uint8_t*>(blobPtr)), blobSize, blob);
+    if (_blobIsReleased) {
+        OPENVINO_THROW("Model was imported (not compiled) by the plugin. Model export is forbidden in this case!");
     }
 
-    stream.write(reinterpret_cast<const char*>(_blob->get_ptr()), _blob->size());
+    _zeGraphExt->getGraphBinary(_handle, blob, blobPtr, blobSize);
+
+    stream.write(reinterpret_cast<const char*>(blobPtr), blobSize);
 
     if (!stream) {
         _logger.error("Write blob to stream failed. Blob is broken!");
@@ -51,12 +52,12 @@ void DriverGraph::export_blob(std::ostream& stream) {
 
     if (_logger.level() >= ov::log::Level::INFO) {
         std::uint32_t result = 1171117u;
-        for (const uint8_t* it = reinterpret_cast<const uint8_t*>(_blob->get_ptr()); it !=  reinterpret_cast<const uint8_t*>(_blob->get_ptr()) + _blob->size(); ++it) {
+        for (const uint8_t* it = blobPtr; it != blobPtr + blobSize; ++it) {
             result = ((result << 7) + result) + static_cast<uint32_t>(*it);
         }
 
         std::stringstream str;
-        str << "Blob size: " << _blob->size() << ", hash: " << std::hex << result;
+        str << "Blob size: " << blobSize << ", hash: " << std::hex << result;
         _logger.info(str.str().c_str());
     }
     _logger.info("Write blob to stream successfully.");
@@ -120,7 +121,6 @@ void DriverGraph::initialize(const Config& config) {
     _zeGraphExt->initializeGraph(_handle, config);
 
     _logger.debug("Graph initialize finish");
-<<<<<<< HEAD
 
     //  We are allowed to release the original blob because weights were loaded in NPU memory during
     //  _zeGraphExt->initializeGraph(). The driver will not access the original blob from this moment on, so we are
@@ -136,9 +136,33 @@ void DriverGraph::initialize(const Config& config) {
 
         _last_submitted_event.resize(number_of_command_lists);
     }
-=======
->>>>>>> 25b5c05976 (Keep `shared_ptr` of blob in IGraph to fix `export_model` for import scenario)
 }
+
+bool DriverGraph::release_blob(const Config& config) {
+    if (_blob == nullptr || _zeroInitStruct->getGraphDdiTable().version() < ZE_GRAPH_EXT_VERSION_1_8 ||
+        config.get<PERF_COUNT>()) {
+        return false;
+    }
+
+    ze_graph_properties_2_t properties = {};
+    properties.stype = ZE_STRUCTURE_TYPE_GRAPH_PROPERTIES;
+    _zeroInitStruct->getGraphDdiTable().pfnGetProperties2(_handle, &properties);
+
+    if (~properties.initStageRequired & ZE_GRAPH_STAGE_INITIALIZE) {
+        return false;
+    }
+
+    if (_blob.use_count() > 1) {
+        // blob is not allocated by plugin, no need for memory optimization
+        return false;        
+    }
+
+    _blob.reset();
+
+    _logger.debug("Blob is released");
+
+    return true;
+};
 
 DriverGraph::~DriverGraph() {
     if (_handle != nullptr) {
