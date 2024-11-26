@@ -15,8 +15,8 @@ DriverGraph::DriverGraph(const std::shared_ptr<ZeGraphExtWrappers>& zeGraphExt,
                          ze_graph_handle_t graphHandle,
                          NetworkMetadata metadata,
                          const Config& config,
-                         std::optional<std::unique_ptr<BlobContainer>> blobPtr)
-    : IGraph(graphHandle, std::move(metadata), config, std::move(blobPtr)),
+                         std::optional<std::unique_ptr<BlobContainer>> blob)
+    : IGraph(graphHandle, std::move(metadata), config, std::move(blob)),
       _zeGraphExt(zeGraphExt),
       _zeroInitStruct(zeroInitStruct),
       _logger("DriverGraph", config.get<LOG_LEVEL>()) {
@@ -32,15 +32,13 @@ DriverGraph::DriverGraph(const std::shared_ptr<ZeGraphExtWrappers>& zeGraphExt,
     initialize(config);
 }
 
-size_t DriverGraph::export_blob(std::ostream& stream) {
-    if (_blob.get() == nullptr) {
-        const uint8_t* blobPtr = nullptr;
-        size_t blobSize = -1;
-        std::shared_ptr<std::vector<uint8_t>> blob;
+size_t DriverGraph::export_blob(std::ostream& stream) const {
+    const uint8_t* blobPtr = nullptr;
+    size_t blobSize;
+    std::vector<uint8_t> blob;
 
-        _zeGraphExt->getGraphBinary(_handle, *blob, blobPtr, blobSize);
-        _blob = std::make_shared<ov::SharedBuffer<std::shared_ptr<std::vector<uint8_t>>>>(reinterpret_cast<char*>(const_cast<uint8_t*>(blobPtr)), blobSize, blob);
-    }
+    _zeGraphExt->getGraphBinary(_handle, *blob, blobPtr, blobSize);
+    _blob = std::make_shared<ov::SharedBuffer<std::shared_ptr<std::vector<uint8_t>>>>(reinterpret_cast<char*>(const_cast<uint8_t*>(blobPtr)), blobSize, blob);
 
     stream.write(reinterpret_cast<const char*>(_blob->get_ptr()), _blob->size());
 
@@ -60,7 +58,7 @@ size_t DriverGraph::export_blob(std::ostream& stream) {
         _logger.info(str.str().c_str());
     }
     _logger.info("Write blob to stream successfully.");
-    return _blob->size();
+    return blobSize;
 }
 
 std::vector<ov::ProfilingInfo> DriverGraph::process_profiling_output(const std::vector<uint8_t>& profData,
@@ -121,6 +119,24 @@ void DriverGraph::initialize(const Config& config) {
     _zeGraphExt->initializeGraph(_handle, config);
 
     _logger.debug("Graph initialize finish");
+<<<<<<< HEAD
+=======
+
+    //  We are allowed to release the original blob because weights were loaded in NPU memory during
+    //  _zeGraphExt->initializeGraph(). The driver will not access the original blob from this moment on, so we are
+    //  releasing it here to avoid unnecessary memory usage.
+    _blobIsReleased = release_blob(config);
+
+    if (config.get<BATCH_MODE>() != ov::intel_npu::BatchMode::COMPILER) {
+        _batch_size = get_batch_size(_metadata);
+    }
+
+    if (config.get<RUN_INFERENCES_SEQUENTIALLY>()) {
+        auto number_of_command_lists = _batch_size.has_value() ? *_batch_size : 1;
+
+        _last_submitted_event.resize(number_of_command_lists);
+    }
+>>>>>>> 28f0d0705b (Re-add `DriverGraph::release_blob` method and adapt to `ov::AlignedBuffer` (no release for mmap shared object))
 }
 
 DriverGraph::~DriverGraph() {
