@@ -139,6 +139,29 @@ void DriverGraph::initialize(const Config& config) {
 >>>>>>> 28f0d0705b (Re-add `DriverGraph::release_blob` method and adapt to `ov::AlignedBuffer` (no release for mmap shared object))
 }
 
+bool DriverGraph::release_blob(const Config& config) {
+    if (_blob == nullptr || _zeroInitStruct->getGraphDdiTable().version() < ZE_GRAPH_EXT_VERSION_1_8 ||
+        config.get<PERF_COUNT>()) {
+        return false;
+    }
+
+    ze_graph_properties_2_t properties = {};
+    properties.stype = ZE_STRUCTURE_TYPE_GRAPH_PROPERTIES;
+    _zeroInitStruct->getGraphDdiTable().pfnGetProperties2(_handle, &properties);
+
+    if (~properties.initStageRequired & ZE_GRAPH_STAGE_INITIALIZE) {
+        return false;
+    }
+
+    if(!_blob->release_from_memory()) {
+        return false;
+    }
+
+    _logger.debug("Blob is released");
+
+    return true;
+};
+
 DriverGraph::~DriverGraph() {
     if (_handle != nullptr) {
         auto result = _zeGraphExt->destroyGraph(_handle);
