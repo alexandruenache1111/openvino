@@ -27,10 +27,6 @@ public:
 
     ov::SupportedOpsMap query(const std::shared_ptr<const ov::Model>& model, const Config& config) const override;
 
-    ov::intel_npu::CompilerType getCompilerType() const override {
-        return ov::intel_npu::CompilerType::DRIVER;
-    }
-
 private:
     /**
      * @brief Serialize input / output information to string format.
