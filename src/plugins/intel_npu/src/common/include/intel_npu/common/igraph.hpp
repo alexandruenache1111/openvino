@@ -17,6 +17,63 @@
 
 namespace intel_npu {
 
+class BlobContainer {
+public:
+    virtual void* get_ptr() {
+        OPENVINO_THROW("const BlobContainer::get_ptr() method is not implemented!");
+    }
+
+    virtual size_t size() const {
+        OPENVINO_THROW("BlobContainer::size() method is not implemented!");
+    }
+
+    virtual bool release_from_memory() {
+        OPENVINO_THROW("BlobContainer::release_from_memory() method is not implemented!");
+    }
+};
+
+class BlobContainerVector : public BlobContainer {
+public:
+    BlobContainerVector(std::vector<uint8_t> blob) : _ownershipBlob(std::move(blob)) {}
+
+    void* get_ptr() override {
+        return reinterpret_cast<void*>(_ownershipBlob.data());
+    }
+
+    size_t size() const override {
+        return _ownershipBlob.size();
+    }
+
+    bool release_from_memory() override {
+        _ownershipBlob.clear();
+        _ownershipBlob.shrink_to_fit();
+        return true;
+    }
+
+private:
+    std::vector<uint8_t> _ownershipBlob;
+};
+
+class BlobContainerAlignedBuffer : public BlobContainer {
+public:
+    BlobContainerAlignedBuffer(const std::shared_ptr<ov::AlignedBuffer>& blobSO) : _ownershipBlob(blobSO) {}
+
+    void* get_ptr() override {
+        return _ownershipBlob->get_ptr();
+    }
+
+    size_t size() const override {
+        return _ownershipBlob->size();
+    }
+
+    bool release_from_memory() override {
+        return false;
+    }
+
+private:
+    std::shared_ptr<ov::AlignedBuffer> _ownershipBlob;
+};
+
 class IGraph : public std::enable_shared_from_this<IGraph> {
 public:
     IGraph(ze_graph_handle_t handle,
@@ -91,6 +148,7 @@ protected:
     std::mutex _mutex;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     std::vector<uint8_t> _blob;
 
     uint32_t _unique_id = 0;
@@ -106,6 +164,9 @@ protected:
 =======
     std::shared_ptr<ov::AlignedBuffer> _blob;
 >>>>>>> 25b5c05976 (Keep `shared_ptr` of blob in IGraph to fix `export_model` for import scenario)
+=======
+    std::unique_ptr<BlobContainer> _blob;
+>>>>>>> 94e33c4e24 (Add `BlobContainer` class and derivates for each `std::vector<uint8_t>` and `std::shared_ptr<ov::AlignedBuffer>` blob types)
 };
 
 }  // namespace intel_npu

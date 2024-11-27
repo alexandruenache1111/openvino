@@ -152,12 +152,9 @@ bool DriverGraph::release_blob(const Config& config) {
         return false;
     }
 
-    if (_blob.use_count() > 1) {
-        // blob is not allocated by plugin, no need for memory optimization
-        return false;        
+    if(!_blob->release_from_memory()) {
+        return false;
     }
-
-    _blob.reset();
 
     _logger.debug("Blob is released");
 
