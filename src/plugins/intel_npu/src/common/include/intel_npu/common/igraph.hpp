@@ -30,6 +30,8 @@ public:
     virtual bool release_from_memory() {
         OPENVINO_THROW("BlobContainer::release_from_memory() method is not implemented!");
     }
+
+    virtual ~BlobContainer() = default;
 };
 
 class BlobContainerVector : public BlobContainer {
@@ -147,9 +149,7 @@ protected:
     // first inference starts running
     std::mutex _mutex;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    std::vector<uint8_t> _blob;
+    std::unique_ptr<BlobContainer> _blob;
 
     uint32_t _unique_id = 0;
     uint32_t _last_submitted_id;
@@ -161,12 +161,6 @@ protected:
     std::optional<std::size_t> _batch_size = std::nullopt;
 
     Logger _logger;
-=======
-    std::shared_ptr<ov::AlignedBuffer> _blob;
->>>>>>> 25b5c05976 (Keep `shared_ptr` of blob in IGraph to fix `export_model` for import scenario)
-=======
-    std::unique_ptr<BlobContainer> _blob;
->>>>>>> 94e33c4e24 (Add `BlobContainer` class and derivates for each `std::vector<uint8_t>` and `std::shared_ptr<ov::AlignedBuffer>` blob types)
 };
 
 }  // namespace intel_npu
