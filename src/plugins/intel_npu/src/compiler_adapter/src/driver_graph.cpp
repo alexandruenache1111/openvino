@@ -139,7 +139,7 @@ void DriverGraph::initialize(const Config& config) {
 }
 
 bool DriverGraph::release_blob(const Config& config) {
-    if (_blob == nullptr || _zeroInitStruct->getGraphDdiTable().version() < ZE_GRAPH_EXT_VERSION_1_8 ||
+    if (_blobPtr == nullptr || _zeroInitStruct->getGraphDdiTable().version() < ZE_GRAPH_EXT_VERSION_1_8 ||
         config.get<PERF_COUNT>()) {
         return false;
     }
@@ -152,7 +152,7 @@ bool DriverGraph::release_blob(const Config& config) {
         return false;
     }
 
-    if (!_blob->release_from_memory()) {
+    if (!_blobPtr->release_from_memory()) {
         return false;
     }
 
