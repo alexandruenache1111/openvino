@@ -759,7 +759,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         _properties.erase(ov::internal::cached_model_buffer.name());
     }
 
-    const std::map<std::string, std::string> propertiesMap = any_copy(_properties);
+    const auto propertiesMap = any_copy(_properties);
     auto localConfig = merge_configs(_globalConfig, propertiesMap, OptionMode::RunTime);
     _logger.setLevel(localConfig.get<LOG_LEVEL>());
     const auto platform = _backends->getCompilationPlatform(localConfig.get<PLATFORM>(), localConfig.get<DEVICE_ID>());
