@@ -796,7 +796,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
 
             blobPtr = std::make_unique<BlobContainerVector>(std::move(blob));
         } else {
-            blobPtr = std::make_unique<BlobContainerAlignedBuffer>(modelBuffer, stream.tellg());
+            blobPtr = std::make_unique<BlobContainerAlignedBuffer>(modelBuffer, stream.tellg(), 0);
         }
 
         auto graph = compiler->parse(std::move(blobPtr), localConfig);
