@@ -147,6 +147,9 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
 
 std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, const std::shared_ptr<ov::AlignedBuffer>& modelBuffer) {
     Logger logger("NPUPlugin", Logger::global().level());
+    if (modelBuffer == nullptr) {
+        return read_metadata_from(stream);
+    }
     size_t magicBytesSize = MAGIC_BYTES.size();
     std::string blobMagicBytes;
     blobMagicBytes.resize(magicBytesSize);
