@@ -11,10 +11,8 @@
 #include "intel_npu/config/config.hpp"
 #include "intel_npu/utils/logger/logger.hpp"
 #include "openvino/core/version.hpp"
-#include "openvino/runtime/shared_buffer.hpp"
 
 namespace {
-
 std::streampos getFileSize(std::istream& stream) {
     auto log = intel_npu::Logger::global().clone("getFileSize");
     if (!stream) {
@@ -25,7 +23,6 @@ std::streampos getFileSize(std::istream& stream) {
         // ov::OwningSharedStreamBuffer scenario
         return stream.rdbuf()->in_avail() + stream.tellg();
     }
-
     const std::streampos streamStart = stream.tellg();
     stream.seekg(0, std::ios_base::end);
     const std::streampos streamEnd = stream.tellg();
@@ -35,16 +32,15 @@ std::streampos getFileSize(std::istream& stream) {
 
     if (streamEnd < streamStart) {
         OPENVINO_THROW("Invalid stream size: streamEnd (",
-                    streamEnd,
-                    ") is not larger than streamStart (",
-                    streamStart,
-                    ")!");
+                       streamEnd,
+                       ") is not larger than streamStart (",
+                       streamStart,
+                       ")!");
     }
 
     return streamEnd - streamStart;
 }
-
-}  // namespace
+}  // anonymous namespace
 
 namespace intel_npu {
 
@@ -63,37 +59,38 @@ void OpenvinoVersion::write(std::ostream& stream) {
     stream.write(_version.data(), _size);
 }
 
-Metadata<METADATA_VERSION_1_0>::Metadata(std::optional<std::string_view> ovVersion, uint64_t blobDataSize)
+Metadata<METADATA_VERSION_1_0>::Metadata(uint64_t blobSize, std::optional<std::string_view> ovVersion)
     : _version{METADATA_VERSION_1_0},
       _ovVersion{ovVersion.value_or(ov::get_openvino_version().buildNumber)},
-      _blobDataSize{blobDataSize} {}
+      _blobDataSize{blobSize} {}
 
 void Metadata<METADATA_VERSION_1_0>::read(std::istream& stream) {
     _ovVersion.read(stream);
 }
 
 void Metadata<METADATA_VERSION_1_0>::write(std::ostream& stream) {
+    stream.write(reinterpret_cast<const char*>(&_version), sizeof(_version));
     _ovVersion.write(stream);
     stream.write(reinterpret_cast<const char*>(&_blobDataSize), sizeof(_blobDataSize));
     stream.write(MAGIC_BYTES.data(), MAGIC_BYTES.size());
 }
 
-std::unique_ptr<MetadataBase> create_metadata(uint32_t version, uint64_t blobDataSize) {
+std::unique_ptr<MetadataBase> create_metadata(uint32_t version, uint64_t blobSize) {
     switch (version) {
     case METADATA_VERSION_1_0:
-        return std::make_unique<Metadata<METADATA_VERSION_1_0>>(std::nullopt, blobDataSize);
+        return std::make_unique<Metadata<METADATA_VERSION_1_0>>(blobSize, std::nullopt);
 
     default:
-        return nullptr;
+        OPENVINO_THROW("Invalid metadata version!");
     }
 }
 
-std::string OpenvinoVersion::get_version() {
+std::string OpenvinoVersion::get_version() const {
     return _version;
 }
 
 bool Metadata<METADATA_VERSION_1_0>::is_compatible() {
-    Logger logger("NPUPlugin", Logger::global().level());
+    auto logger = Logger::global().clone("NPUBlobMetadata");
     // checking if we can import the blob
     if (_ovVersion.get_version() != ov::get_openvino_version().buildNumber) {
         logger.warning("Imported blob OpenVINO version: %s, but the current OpenVINO version is: %s",
@@ -113,7 +110,7 @@ bool Metadata<METADATA_VERSION_1_0>::is_compatible() {
 }
 
 std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
-    Logger logger("NPUPlugin", Logger::global().level());
+    auto logger = Logger::global().clone("NPUBlobMetadata");
     size_t magicBytesSize = MAGIC_BYTES.size();
     std::string blobMagicBytes;
     blobMagicBytes.resize(magicBytesSize);
@@ -123,8 +120,7 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
     stream.seekg(-currentStreamPos + streamSize - magicBytesSize, std::ios::cur);
     stream.read(blobMagicBytes.data(), magicBytesSize);
     if (MAGIC_BYTES != blobMagicBytes) {
-        logger.error("Blob is missing NPU metadata!");
-        return nullptr;
+        OPENVINO_THROW("Blob is missing NPU metadata!");
     }
 
     uint64_t blobDataSize;
@@ -139,7 +135,7 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
     try {
         storedMeta = create_metadata(metaVersion, blobDataSize);
         storedMeta->read(stream);
-    } catch(...) {
+    } catch (...) {
         logger.warning("Imported blob metadata version: %d.%d, but the current version is: %d.%d",
                        get_major(metaVersion),
                        get_minor(metaVersion),
@@ -149,15 +145,8 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
         OPENVINO_THROW("NPU metadata mismatch.");
     }
     stream.seekg(-stream.tellg() + currentStreamPos, std::ios::cur);
+
     return storedMeta;
-}
-
-void Metadata<METADATA_VERSION_1_0>::set_version(uint32_t newVersion) {
-    _version = newVersion;
-}
-
-void Metadata<METADATA_VERSION_1_0>::set_ov_version(const OpenvinoVersion& newVersion) {
-    _ovVersion = newVersion;
 }
 
 uint64_t Metadata<METADATA_VERSION_1_0>::get_blob_size() const {

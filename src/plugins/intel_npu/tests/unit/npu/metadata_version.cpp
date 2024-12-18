@@ -6,55 +6,68 @@
 
 #include "common_test_utils/test_assertions.hpp"
 #include "metadata.hpp"
+#include "openvino/core/version.hpp"
 
 using namespace intel_npu;
 
 using MetadataUnitTests = ::testing::Test;
 
-TEST_F(MetadataUnitTests, readUnversionedBlob) {
-    std::stringstream stream(" ELF");
+struct MetadataTest : Metadata<CURRENT_METADATA_VERSION> {
+    MetadataTest(uint64_t blobSize, std::optional<std::string_view> ovVersion)
+        : Metadata<CURRENT_METADATA_VERSION>(blobSize, ovVersion) {}
 
-    auto storedMeta = read_metadata_from(stream);
-    ASSERT_EQ(storedMeta, nullptr);
+    void set_version(uint32_t newVersion) {
+        _version = newVersion;
+    }
+
+    void set_ov_version(const OpenvinoVersion& newVersion) {
+        _ovVersion = newVersion;
+    }
+};
+
+TEST_F(MetadataUnitTests, readUnversionedBlob) {
+    std::stringstream blob("this_is an_unversioned bl0b");
+
+    std::unique_ptr<MetadataBase> storedMeta;
+    ASSERT_ANY_THROW(storedMeta = read_metadata_from(blob));
 }
 
 TEST_F(MetadataUnitTests, writeAndReadMetadataFromBlob) {
     std::stringstream stream;
-    size_t blobSize = 0;
-    auto meta = Metadata<CURRENT_METADATA_VERSION>(blobSize);
+    uint64_t blobSize = 0;
+    auto meta = MetadataTest(blobSize, ov::get_openvino_version().buildNumber);
 
     OV_ASSERT_NO_THROW(meta.write(stream));
 
-    auto storedMeta = read_metadata_from(stream);
-    ASSERT_NE(storedMeta, nullptr);
+    std::unique_ptr<MetadataBase> storedMeta;
+    OV_ASSERT_NO_THROW(storedMeta = read_metadata_from(stream));
     ASSERT_TRUE(storedMeta->is_compatible());
 }
 
 TEST_F(MetadataUnitTests, writeAndReadInvalidOpenvinoVersion) {
-    size_t blobSize = 0;
+    uint64_t blobSize = 0;
     std::stringstream stream;
-    auto meta = Metadata<CURRENT_METADATA_VERSION>(blobSize);
+    auto meta = MetadataTest(blobSize, std::nullopt);
 
     OpenvinoVersion badOvVersion("just_some_wrong_ov_version");
     meta.set_ov_version(badOvVersion);
 
     OV_ASSERT_NO_THROW(meta.write(stream));
 
-    auto storedMeta = read_metadata_from(stream);
-    ASSERT_NE(storedMeta, nullptr);
+    std::unique_ptr<MetadataBase> storedMeta;
+    OV_ASSERT_NO_THROW(storedMeta = read_metadata_from(stream));
     ASSERT_FALSE(storedMeta->is_compatible());
 }
 
 TEST_F(MetadataUnitTests, writeAndReadInvalidMetadataVersion) {
-    size_t blobSize = 0;
+    uint64_t blobSize = 0;
     std::stringstream stream;
-    auto meta = Metadata<CURRENT_METADATA_VERSION>(blobSize);
+    auto meta = MetadataTest(blobSize, std::nullopt);
 
     constexpr uint32_t dummy_version = make_version(0x00007E57, 0x0000AC3D);
     meta.set_version(dummy_version);
 
     OV_ASSERT_NO_THROW(meta.write(stream));
 
-    auto storedMeta = read_metadata_from(stream);
-    ASSERT_EQ(storedMeta, nullptr);
+    ASSERT_ANY_THROW(auto storedMeta = read_metadata_from(stream));
 }

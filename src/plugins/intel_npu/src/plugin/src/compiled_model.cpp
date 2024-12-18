@@ -75,7 +75,7 @@ void CompiledModel::export_model(std::ostream& stream) const {
     _logger.debug("CompiledModel::export_model");
     size_t blobSizeBeforeVersioning = _graph->export_blob(stream);
 
-    auto meta = Metadata<CURRENT_METADATA_VERSION>(ov::get_openvino_version().buildNumber, blobSizeBeforeVersioning);
+    auto meta = Metadata<CURRENT_METADATA_VERSION>(blobSizeBeforeVersioning, ov::get_openvino_version().buildNumber);
     meta.write(stream);
 }
 

@@ -11,8 +11,6 @@
 #include <string>
 #include <vector>
 
-#include <openvino/runtime/aligned_buffer.hpp>
-
 namespace intel_npu {
 
 /**
@@ -85,7 +83,7 @@ public:
     /**
      * @brief Gets the version string.
      */
-    std::string get_version();
+    std::string get_version() const;
 };
 
 struct MetadataBase {
@@ -119,14 +117,13 @@ struct Metadata : public MetadataBase {};
  */
 template <>
 struct Metadata<METADATA_VERSION_1_0> : public MetadataBase {
-private:
+protected:
     uint32_t _version;
     OpenvinoVersion _ovVersion;
-    size_t _ovHeaderOffset;
     uint64_t _blobDataSize;
 
 public:
-    Metadata(std::optional<std::string_view> ovVersion = std::nullopt, uint64_t blobDataSize);
+    Metadata(uint64_t blobSize, std::optional<std::string_view> ovVersion = std::nullopt);
 
     void read(std::istream& stream) override;
 
@@ -146,10 +143,6 @@ public:
      */
     bool is_compatible() override;
 
-    void set_version(uint32_t newVersion);
-
-    void set_ov_version(const OpenvinoVersion& newVersion);
-
     uint64_t get_blob_size() const override;
 };
 
@@ -159,7 +152,7 @@ public:
  * @return Unique pointer to the created MetadataBase object if the major version is supported; otherwise, returns
  * 'nullptr'.
  */
-std::unique_ptr<MetadataBase> create_metadata(uint32_t version, uint64_t blobDataSize);
+std::unique_ptr<MetadataBase> create_metadata(uint32_t version, uint64_t blobSize);
 
 /**
  * @brief Reads metadata from a blob.

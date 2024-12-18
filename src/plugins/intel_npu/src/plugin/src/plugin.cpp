@@ -759,14 +759,12 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         CompilerAdapterFactory compilerAdapterFactory;
         auto compiler = compilerAdapterFactory.getCompiler(_backends->getIEngineBackend(), localConfig);
 
-        std::unique_ptr<BlobContainer> blobPtr;
         auto storedMeta = read_metadata_from(stream);
-        
-        if (storedMeta == nullptr) {
-            OPENVINO_THROW("Could not read metadata!");
-        } else if (!storedMeta->is_compatible()) {
+        if (!storedMeta->is_compatible()) {
             OPENVINO_THROW("Incompatible blob version!");
         }
+
+        std::unique_ptr<BlobContainer> blobPtr;
         auto graphSize = storedMeta->get_blob_size();
 
         if (modelBuffer == nullptr) {
