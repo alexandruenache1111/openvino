@@ -103,8 +103,6 @@ struct MetadataBase {
 
     virtual uint64_t get_blob_size() const = 0;
 
-    virtual size_t get_ov_header_offset() const = 0;
-
     virtual ~MetadataBase() = default;
 };
 
@@ -128,9 +126,7 @@ private:
     uint64_t _blobDataSize;
 
 public:
-    Metadata(std::optional<std::string_view> ovVersion = std::nullopt);
-
-    Metadata(size_t ovHeaderOffset, uint64_t blobDataSize);
+    Metadata(std::optional<std::string_view> ovVersion = std::nullopt, uint64_t blobDataSize);
 
     void read(std::istream& stream) override;
 
@@ -155,8 +151,6 @@ public:
     void set_ov_version(const OpenvinoVersion& newVersion);
 
     uint64_t get_blob_size() const override;
-
-    size_t get_ov_header_offset() const override;
 };
 
 /**
@@ -165,7 +159,7 @@ public:
  * @return Unique pointer to the created MetadataBase object if the major version is supported; otherwise, returns
  * 'nullptr'.
  */
-std::unique_ptr<MetadataBase> create_metadata(uint32_t version, size_t ovHeaderOffset, uint64_t blobDataSize);
+std::unique_ptr<MetadataBase> create_metadata(uint32_t version, uint64_t blobDataSize);
 
 /**
  * @brief Reads metadata from a blob.
@@ -174,7 +168,5 @@ std::unique_ptr<MetadataBase> create_metadata(uint32_t version, size_t ovHeaderO
  * MetadataBase object; otherwise, returns 'nullptr'.
  */
 std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream);
-
-std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, const std::shared_ptr<ov::AlignedBuffer>& modelBuffer);
 
 }  // namespace intel_npu

@@ -760,7 +760,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         auto compiler = compilerAdapterFactory.getCompiler(_backends->getIEngineBackend(), localConfig);
 
         std::unique_ptr<BlobContainer> blobPtr;
-        auto storedMeta = read_metadata_from(stream, modelBuffer);
+        auto storedMeta = read_metadata_from(stream);
         
         if (storedMeta == nullptr) {
             OPENVINO_THROW("Could not read metadata!");
@@ -779,7 +779,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
 
             blobPtr = std::make_unique<BlobContainerVector>(std::move(blob));
         } else {
-            blobPtr = std::make_unique<BlobContainerAlignedBuffer>(modelBuffer, storedMeta->get_ov_header_offset(), graphSize);
+            blobPtr = std::make_unique<BlobContainerAlignedBuffer>(modelBuffer, stream.tellg(), graphSize);
         }
 
         auto graph = compiler->parse(std::move(blobPtr), localConfig);

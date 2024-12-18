@@ -15,15 +15,20 @@
 
 namespace {
 
-size_t getFileSize(std::istream& stream) {
+std::streampos getFileSize(std::istream& stream) {
     auto log = intel_npu::Logger::global().clone("getFileSize");
     if (!stream) {
         OPENVINO_THROW("Stream is in bad status! Please check the passed stream status!");
     }
 
-    const size_t streamStart = stream.tellg();
+    if (stream.rdbuf()->in_avail() != 0) {
+        // ov::OwningSharedStreamBuffer scenario
+        return stream.rdbuf()->in_avail() + stream.tellg();
+    }
+
+    const std::streampos streamStart = stream.tellg();
     stream.seekg(0, std::ios_base::end);
-    const size_t streamEnd = stream.tellg();
+    const std::streampos streamEnd = stream.tellg();
     stream.seekg(streamStart, std::ios_base::beg);
 
     log.debug("Read blob size: streamStart=%zu, streamEnd=%zu", streamStart, streamEnd);
@@ -58,10 +63,9 @@ void OpenvinoVersion::write(std::ostream& stream) {
     stream.write(_version.data(), _size);
 }
 
-Metadata<METADATA_VERSION_1_0>::Metadata(std::optional<std::string_view> ovVersion, size_t ovHeaderOffset, uint64_t blobDataSize)
+Metadata<METADATA_VERSION_1_0>::Metadata(std::optional<std::string_view> ovVersion, uint64_t blobDataSize)
     : _version{METADATA_VERSION_1_0},
       _ovVersion{ovVersion.value_or(ov::get_openvino_version().buildNumber)},
-      _ovHeaderOffset{ovHeaderOffset},
       _blobDataSize{blobDataSize} {}
 
 void Metadata<METADATA_VERSION_1_0>::read(std::istream& stream) {
@@ -69,14 +73,15 @@ void Metadata<METADATA_VERSION_1_0>::read(std::istream& stream) {
 }
 
 void Metadata<METADATA_VERSION_1_0>::write(std::ostream& stream) {
-    stream.write(reinterpret_cast<const char*>(&_version), sizeof(_version));
     _ovVersion.write(stream);
+    stream.write(reinterpret_cast<const char*>(&_blobDataSize), sizeof(_blobDataSize));
+    stream.write(MAGIC_BYTES.data(), MAGIC_BYTES.size());
 }
 
-std::unique_ptr<MetadataBase> create_metadata(uint32_t version, size_t ovHeaderOffset, uint64_t blobDataSize) {
+std::unique_ptr<MetadataBase> create_metadata(uint32_t version, uint64_t blobDataSize) {
     switch (version) {
     case METADATA_VERSION_1_0:
-        return std::make_unique<Metadata<METADATA_VERSION_1_0>>(std::nullopt, ovHeaderOffset, blobDataSize);
+        return std::make_unique<Metadata<METADATA_VERSION_1_0>>(std::nullopt, blobDataSize);
 
     default:
         return nullptr;
@@ -113,9 +118,9 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
     std::string blobMagicBytes;
     blobMagicBytes.resize(magicBytesSize);
 
-    size_t currentStreamPos = stream.tellg();
-    size_t streamSize = getFileSize(stream);
-    stream.seekg(streamSize - magicBytesSize, std::ios::beg);
+    std::streampos currentStreamPos = stream.tellg();
+    std::streampos streamSize = getFileSize(stream);
+    stream.seekg(-currentStreamPos + streamSize - magicBytesSize, std::ios::cur);
     stream.read(blobMagicBytes.data(), magicBytesSize);
     if (MAGIC_BYTES != blobMagicBytes) {
         logger.error("Blob is missing NPU metadata!");
@@ -123,55 +128,16 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
     }
 
     uint64_t blobDataSize;
-    stream.seekg(streamSize - magicBytesSize - sizeof(blobDataSize), std::ios::beg);
+    stream.seekg(-std::streampos(magicBytesSize) - sizeof(blobDataSize), std::ios::cur);
     stream.read(reinterpret_cast<char*>(&blobDataSize), sizeof(blobDataSize));
-    stream.seekg(currentStreamPos + blobDataSize, std::ios::beg);
+    stream.seekg(-stream.tellg() + currentStreamPos + blobDataSize, std::ios::cur);
 
     uint32_t metaVersion;
     stream.read(reinterpret_cast<char*>(&metaVersion), sizeof(metaVersion));
 
     std::unique_ptr<MetadataBase> storedMeta;
     try {
-        storedMeta = create_metadata(metaVersion, currentStreamPos, blobDataSize);
-        storedMeta->read(metadataStream);
-    } catch (...) {
-        logger.warning("Imported blob metadata version: %d.%d, but the current version is: %d.%d",
-                       get_major(metaVersion),
-                       get_minor(metaVersion),
-                       get_major(CURRENT_METADATA_VERSION),
-                       get_minor(CURRENT_METADATA_VERSION));
-    }
-    stream.seekg(currentStreamPos, std::ios::beg);
-    return storedMeta;
-}
-
-std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, const std::shared_ptr<ov::AlignedBuffer>& modelBuffer) {
-    Logger logger("NPUPlugin", Logger::global().level());
-    if (modelBuffer == nullptr) {
-        return read_metadata_from(stream);
-    }
-    size_t magicBytesSize = MAGIC_BYTES.size();
-    std::string blobMagicBytes;
-    blobMagicBytes.resize(magicBytesSize);
-
-    size_t currentStreamPos = stream.tellg();
-    size_t streamSize = modelBuffer->size();
-
-    blobMagicBytes.assign(reinterpret_cast<const char*>(modelBuffer->get_ptr(streamSize - magicBytesSize)), magicBytesSize);
-    if (MAGIC_BYTES != blobMagicBytes) {
-        logger.error("Blob is missing NPU metadata!");
-        return nullptr;
-    }
-
-    uint64_t blobDataSize;
-    blobDataSize = *reinterpret_cast<uint64_t*>(modelBuffer->get_ptr(streamSize - magicBytesSize - sizeof(blobDataSize)));
-
-    uint32_t metaVersion;
-    metaVersion = *reinterpret_cast<uint32_t*>(modelBuffer->get_ptr(currentStreamPos + blobDataSize));
-
-    stream.seekg(blobDataSize + sizeof(metaVersion), std::ios::cur);
-    try {
-        auto storedMeta = create_metadata(metaVersion, currentStreamPos, blobDataSize);
+        storedMeta = create_metadata(metaVersion, blobDataSize);
         storedMeta->read(stream);
     } catch(...) {
         logger.warning("Imported blob metadata version: %d.%d, but the current version is: %d.%d",
@@ -182,6 +148,7 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, const std
 
         OPENVINO_THROW("NPU metadata mismatch.");
     }
+    stream.seekg(-stream.tellg() + currentStreamPos, std::ios::cur);
     return storedMeta;
 }
 
@@ -195,10 +162,6 @@ void Metadata<METADATA_VERSION_1_0>::set_ov_version(const OpenvinoVersion& newVe
 
 uint64_t Metadata<METADATA_VERSION_1_0>::get_blob_size() const {
     return _blobDataSize;
-}
-
-size_t Metadata<METADATA_VERSION_1_0>::get_ov_header_offset() const {
-    return _ovHeaderOffset;
 }
 
 }  // namespace intel_npu

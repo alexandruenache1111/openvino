@@ -21,11 +21,9 @@ TEST_F(MetadataUnitTests, readUnversionedBlob) {
 TEST_F(MetadataUnitTests, writeAndReadMetadataFromBlob) {
     std::stringstream stream;
     size_t blobSize = 0;
-    auto meta = Metadata<CURRENT_METADATA_VERSION>(stream.tellg(), blobSize);
+    auto meta = Metadata<CURRENT_METADATA_VERSION>(blobSize);
 
     OV_ASSERT_NO_THROW(meta.write(stream));
-    OV_ASSERT_NO_THROW(stream.write(reinterpret_cast<const char*>(&blobSize), sizeof(blobSize)));
-    OV_ASSERT_NO_THROW(stream.write(MAGIC_BYTES.data(), MAGIC_BYTES.size()));
 
     auto storedMeta = read_metadata_from(stream);
     ASSERT_NE(storedMeta, nullptr);
@@ -35,14 +33,12 @@ TEST_F(MetadataUnitTests, writeAndReadMetadataFromBlob) {
 TEST_F(MetadataUnitTests, writeAndReadInvalidOpenvinoVersion) {
     size_t blobSize = 0;
     std::stringstream stream;
-    auto meta = Metadata<CURRENT_METADATA_VERSION>(stream.tellg(), blobSize);
+    auto meta = Metadata<CURRENT_METADATA_VERSION>(blobSize);
 
     OpenvinoVersion badOvVersion("just_some_wrong_ov_version");
     meta.set_ov_version(badOvVersion);
 
     OV_ASSERT_NO_THROW(meta.write(stream));
-    OV_ASSERT_NO_THROW(stream.write(reinterpret_cast<const char*>(&blobSize), sizeof(blobSize)));
-    OV_ASSERT_NO_THROW(stream.write(MAGIC_BYTES.data(), MAGIC_BYTES.size()));
 
     auto storedMeta = read_metadata_from(stream);
     ASSERT_NE(storedMeta, nullptr);
@@ -52,14 +48,12 @@ TEST_F(MetadataUnitTests, writeAndReadInvalidOpenvinoVersion) {
 TEST_F(MetadataUnitTests, writeAndReadInvalidMetadataVersion) {
     size_t blobSize = 0;
     std::stringstream stream;
-    auto meta = Metadata<CURRENT_METADATA_VERSION>(stream.tellg(), blobSize);
+    auto meta = Metadata<CURRENT_METADATA_VERSION>(blobSize);
 
     constexpr uint32_t dummy_version = make_version(0x00007E57, 0x0000AC3D);
     meta.set_version(dummy_version);
 
     OV_ASSERT_NO_THROW(meta.write(stream));
-    OV_ASSERT_NO_THROW(stream.write(reinterpret_cast<const char*>(&blobSize), sizeof(blobSize)));
-    OV_ASSERT_NO_THROW(stream.write(MAGIC_BYTES.data(), MAGIC_BYTES.size()));
 
     auto storedMeta = read_metadata_from(stream);
     ASSERT_EQ(storedMeta, nullptr);
