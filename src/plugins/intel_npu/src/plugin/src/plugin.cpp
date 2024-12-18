@@ -17,6 +17,7 @@
 #include "intel_npu/config/npuw.hpp"
 #include "intel_npu/config/runtime.hpp"
 #include "intel_npu/utils/zero/zero_init.hpp"
+#include "metadata.hpp"
 #include "npuw/compiled_model.hpp"
 #include "openvino/op/constant.hpp"
 #include "openvino/op/parameter.hpp"
@@ -797,6 +798,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
             blobPtr = std::make_unique<BlobContainerVector>(std::move(blob));
         } else {
             blobPtr = std::make_unique<BlobContainerAlignedBuffer>(modelBuffer, stream.tellg(), 0);
+        }
+
+        auto storedMeta = read_metadata_from(blob);
+        if (!storedMeta->is_compatible()) {
+            OPENVINO_THROW("Incompatible blob version!");
         }
 
         auto graph = compiler->parse(std::move(blobPtr), localConfig);
