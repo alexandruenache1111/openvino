@@ -132,30 +132,6 @@ std::map<std::string, std::string> any_copy(const ov::AnyMap& params) {
     return result;
 }
 
-size_t getFileSize(std::istream& stream) {
-    auto log = Logger::global().clone("getFileSize");
-    if (!stream) {
-        OPENVINO_THROW("Stream is in bad status! Please check the passed stream status!");
-    }
-
-    const size_t streamStart = stream.tellg();
-    stream.seekg(0, std::ios_base::end);
-    const size_t streamEnd = stream.tellg();
-    stream.seekg(streamStart, std::ios_base::beg);
-
-    log.debug("Read blob size: streamStart=%zu, streamEnd=%zu", streamStart, streamEnd);
-
-    if (streamEnd < streamStart) {
-        OPENVINO_THROW("Invalid stream size: streamEnd (",
-                       streamEnd,
-                       ") is not larger than streamStart (",
-                       streamStart,
-                       ")!");
-    }
-
-    return streamEnd - streamStart;
-}
-
 void update_log_level(const std::map<std::string, std::string>& propertiesMap) {
     auto it = propertiesMap.find(std::string(LOG_LEVEL::key()));
     if (it != propertiesMap.end()) {
@@ -784,10 +760,22 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         auto compiler = compilerAdapterFactory.getCompiler(_backends->getIEngineBackend(), localConfig);
 
         std::unique_ptr<BlobContainer> blobPtr;
+        std::unique_ptr<MetadataBase> storedMeta;
+
+        if (dynamic_cast<ov::OwningSharedStreamBuffer*>(stream.rdbuf())) {
+            storedMeta = read_metadata_from(stream, dynamic_cast<ov::OwningSharedStreamBuffer*>(stream.rdbuf())->get_buffer());
+        } else {
+            storedMeta = read_metadata_from(stream);
+        }
+        
+        if (storedMeta == nullptr) {
+            OPENVINO_THROW("Could not read metadata!");
+        } else if (!storedMeta->is_compatible()) {
+            OPENVINO_THROW("Incompatible blob version!");
+        }
+        auto graphSize = storedMeta->get_blob_size();
 
         if (modelBuffer == nullptr) {
-            auto graphSize = getFileSize(stream);
-
             std::vector<uint8_t> blob(graphSize);
             stream.read(reinterpret_cast<char*>(blob.data()), graphSize);
             if (!stream) {
@@ -797,7 +785,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
 
             blobPtr = std::make_unique<BlobContainerVector>(std::move(blob));
         } else {
-            blobPtr = std::make_unique<BlobContainerAlignedBuffer>(modelBuffer, stream.tellg(), 0);
+            blobPtr = std::make_unique<BlobContainerAlignedBuffer>(modelBuffer, storedMeta->get_ov_header_offset(), graphSize);
         }
 
         auto storedMeta = read_metadata_from(blob);

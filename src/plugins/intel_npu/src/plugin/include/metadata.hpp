@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include <openvino/runtime/aligned_buffer.hpp>
+
 namespace intel_npu {
 
 /**
@@ -99,6 +101,10 @@ struct MetadataBase {
 
     virtual bool is_compatible() = 0;
 
+    virtual uint64_t get_blob_size() const = 0;
+
+    virtual size_t get_ov_header_offset() const = 0;
+
     virtual ~MetadataBase() = default;
 };
 
@@ -115,12 +121,16 @@ struct Metadata : public MetadataBase {};
  */
 template <>
 struct Metadata<METADATA_VERSION_1_0> : public MetadataBase {
-protected:
+private:
     uint32_t _version;
     OpenvinoVersion _ovVersion;
+    size_t _ovHeaderOffset;
+    uint64_t _blobDataSize;
 
 public:
     Metadata(std::optional<std::string_view> ovVersion = std::nullopt);
+
+    Metadata(size_t ovHeaderOffset, uint64_t blobDataSize);
 
     void read(std::istream& stream) override;
 
@@ -139,6 +149,14 @@ public:
      * @note The version check can be disabled if the "NPU_DISABLE_VERSION_CHECK" environment variable is set to '1'.
      */
     bool is_compatible() override;
+
+    void set_version(uint32_t newVersion);
+
+    void set_ov_version(const OpenvinoVersion& newVersion);
+
+    uint64_t get_blob_size() const override;
+
+    size_t get_ov_header_offset() const override;
 };
 
 /**
@@ -147,7 +165,7 @@ public:
  * @return Unique pointer to the created MetadataBase object if the major version is supported; otherwise, returns
  * 'nullptr'.
  */
-std::unique_ptr<MetadataBase> create_metadata(uint32_t version);
+std::unique_ptr<MetadataBase> create_metadata(uint32_t version, size_t ovHeaderOffset, uint64_t blobDataSize);
 
 /**
  * @brief Reads metadata from a blob.
@@ -155,6 +173,8 @@ std::unique_ptr<MetadataBase> create_metadata(uint32_t version);
  * @return If the blob is versioned and its major version is supported, returns an unique pointer to the read
  * MetadataBase object; otherwise, returns 'nullptr'.
  */
-std::unique_ptr<MetadataBase> read_metadata_from(const std::vector<uint8_t>& blob);
+std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream);
+
+std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, const std::shared_ptr<ov::AlignedBuffer>& modelBuffer);
 
 }  // namespace intel_npu

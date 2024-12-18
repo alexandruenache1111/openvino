@@ -47,19 +47,17 @@ private:
 class BlobContainerAlignedBuffer : public BlobContainer {
 public:
     BlobContainerAlignedBuffer(const std::shared_ptr<ov::AlignedBuffer>& blobSO,
-                               size_t ovHeaderOffset,
-                               size_t metadataSize)
-        : _ownershipBlob(blobSO),
+                               size_t ovHeaderOffset, uint64_t blobSize)
+        : _blobSize(blobSize),
           _ovHeaderOffset(ovHeaderOffset),
-          _metadataSize(metadataSize) {}
+          _ownershipBlob(blobSO) {}
 
     void* get_ptr() override {
         return _ownershipBlob->get_ptr(_ovHeaderOffset);
     }
 
     size_t size() const override {
-        // remove OV header offset and metadata from blob size
-        return _ownershipBlob->size() - _ovHeaderOffset - _metadataSize;
+        return _blobSize;
     }
 
     bool release_from_memory() override {
@@ -67,9 +65,9 @@ public:
     }
 
 private:
-    std::shared_ptr<ov::AlignedBuffer> _ownershipBlob;
+    uint64_t _blobSize;
     size_t _ovHeaderOffset;
-    size_t _metadataSize;
+    std::shared_ptr<ov::AlignedBuffer> _ownershipBlob;
 };
 
 }  // namespace intel_npu
