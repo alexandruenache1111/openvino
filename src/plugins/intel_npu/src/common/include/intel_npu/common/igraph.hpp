@@ -90,7 +90,7 @@ protected:
     // first inference starts running
     std::mutex _mutex;
 
-    std::unique_ptr<BlobContainer> _blobPtr;
+    const std::unique_ptr<BlobContainer> _blobPtr;
 
     uint32_t _unique_id = 0;
     uint32_t _last_submitted_id;
