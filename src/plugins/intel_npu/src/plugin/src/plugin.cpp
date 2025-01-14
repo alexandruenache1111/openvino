@@ -788,7 +788,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
             OPENVINO_THROW("Incompatible blob version!");
         }
 
-        auto graphSize = storedMeta->get_blob_size();
+        auto graphSize = getFileSize(stream);
 
         std::vector<uint8_t> blob(graphSize);
         stream.read(reinterpret_cast<char*>(blob.data()), graphSize);

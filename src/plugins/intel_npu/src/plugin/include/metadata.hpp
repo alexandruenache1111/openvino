@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+std::streampos getFileSize(std::istream& stream);
+
 namespace intel_npu {
 
 struct MetadataBase {

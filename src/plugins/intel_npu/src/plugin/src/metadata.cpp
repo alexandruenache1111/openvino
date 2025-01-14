@@ -12,7 +12,6 @@
 #include "intel_npu/utils/logger/logger.hpp"
 #include "openvino/core/version.hpp"
 
-namespace {
 
 std::streampos getFileSize(std::istream& stream) {
     auto log = intel_npu::Logger::global().clone("getFileSize");
@@ -41,7 +40,6 @@ std::streampos getFileSize(std::istream& stream) {
 
     return streamEnd - streamStart;
 }
-}  // anonymous namespace
 
 namespace intel_npu {
 
