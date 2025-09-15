@@ -1203,7 +1203,11 @@ int main(int argc, char* argv[]) {
             }
 
             if (FLAGS_api == "sync") {
-                inferRequest->infer();
+                try {
+                    inferRequest->infer();
+                } catch(const std::exception& ex) {
+                    std::cout << "Error infer: " << ex.what()  << '\n';
+                }
             } else {
                 inferRequest->start_async();
             }
