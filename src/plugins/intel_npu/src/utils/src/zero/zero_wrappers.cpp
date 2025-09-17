@@ -153,6 +153,7 @@ CommandQueue::CommandQueue(const std::shared_ptr<ZeroInitStructsHolder>& init_st
                            const uint32_t command_queue_options)
     : _init_structs(init_structs),
       _log("CommandQueue", Logger::global().level()) {
+        std::cout << reinterpret_cast<void*>(zeCommandQueueExecuteCommandLists) << '\n';
     ze_command_queue_desc_t queue_desc =
         {ZE_STRUCTURE_TYPE_COMMAND_QUEUE_DESC, nullptr, group_ordinal, 0, 0, ZE_COMMAND_QUEUE_MODE_DEFAULT, priority};
 
@@ -191,8 +192,10 @@ void CommandQueue::executeCommandList(CommandList& command_list) const {
                                 zeCommandQueueExecuteCommandLists(_handle, 1, &command_list._handle, nullptr));
 }
 void CommandQueue::executeCommandList(CommandList& command_list, Fence& fence) const {
-    THROW_ON_FAIL_FOR_LEVELZERO("zeCommandQueueExecuteCommandLists",
-                                zeCommandQueueExecuteCommandLists(_handle, 1, &command_list._handle, fence.handle()));
+    std::cout << _handle << " " << &command_list._handle << " " << fence.handle();
+    std::cout << reinterpret_cast<void*>(zeCommandQueueExecuteCommandLists) << '\n';
+    auto result = zeCommandQueueExecuteCommandLists(_handle, 1, &command_list._handle, fence.handle());
+    (void) result;
 }
 
 void CommandQueue::setWorkloadType(ze_command_queue_workload_type_t workloadType) const {

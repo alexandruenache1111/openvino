@@ -46,7 +46,9 @@ public:
     }
 
     void start_async() {
+        std::cout << "start async: before time\n";
         _startTime = Time::now();
+        std::cout << "start async: after time\n";
         _request.start_async();
     }
 
@@ -56,6 +58,7 @@ public:
 
     void infer() {
         _startTime = Time::now();
+        std::cout << "bapp wrapper infer sync\n";
         _request.infer();
         _endTime = Time::now();
         _callbackQueue(_id, _lat_group_id, get_execution_time_in_milliseconds(), nullptr);
@@ -180,12 +183,17 @@ public:
 
     void wait_all() {
         std::unique_lock<std::mutex> lock(_mutex);
+        std::cout << "mutex\n";
         _cv.wait(lock, [this] {
+            std::cout << "inside wait\n";
             if (inferenceException) {
+                std::cout << "inference exception\n";
                 std::rethrow_exception(inferenceException);
             }
+            std::cout << "to return\n";
             return _idleIds.size() == requests.size();
         });
+        std::cout << "outside lambda\n";
     }
 
     std::vector<double> get_latencies() {

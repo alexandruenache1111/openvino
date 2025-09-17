@@ -531,6 +531,7 @@ void ZeroInferRequest::infer() {
     if (_config.get<RUN_INFERENCES_SEQUENTIALLY>()) {
         OPENVINO_THROW("Only start async is supported when RUN_INFERENCES_SEQUENTIALLY is enabled!");
     }
+    std::cout << "infer\n";
 
     infer_async();
     get_result();

@@ -226,6 +226,7 @@ private:
 
     template <typename F>
     void infer_impl(const F& f) {
+        std::cout << "inside infer_impl\n";
         check_tensors();
         InferState state = InferState::IDLE;
         {

@@ -163,6 +163,7 @@ Plugin::Plugin()
       _logger("NPUPlugin", Logger::global().level()) {
     OV_ITT_SCOPED_TASK(itt::domains::NPUPlugin, "Plugin::Plugin");
     set_device_name("NPU");
+    std::cout << "plugin\n\n";
 
     // parse env_variables to get LOG_LEVEL if needed
     _options->add<LOG_LEVEL>();

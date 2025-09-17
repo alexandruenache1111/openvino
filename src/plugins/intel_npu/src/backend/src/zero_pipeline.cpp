@@ -180,6 +180,7 @@ void Pipeline::push() {
 
     if (_init_structs->getCommandQueueDdiTable().version() < ZE_MAKE_VERSION(1, 1) &&
         _config.get<RUN_INFERENCES_SEQUENTIALLY>()) {
+            std::cout << "weird if version push\n";
         if (_id) {
             auto previousIndex = _graph->get_last_submitted_id();
 
@@ -196,7 +197,10 @@ void Pipeline::push() {
 
         OV_ITT_TASK_CHAIN(ZERO_PIPELINE_IP_PUSH, itt::domains::LevelZeroBackend, "Pipeline", "push");
         if (_sync_output_with_fences) {
+            std::cout << "before get_command_queue->executeCommandList\n";
+            getchar();
             _graph->get_command_queue()->executeCommandList(*_command_lists.at(i), *_fences.at(i));
+            std::cout << "after get_command_queue->executeCommandList\n";
         } else {
             _graph->get_command_queue()->executeCommandList(*_command_lists.at(i));
         }

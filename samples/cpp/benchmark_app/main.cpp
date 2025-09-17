@@ -335,6 +335,8 @@ void fuse_mean_scale(ov::preprocess::PrePostProcessor& preproc, const benchmark_
  */
 int main(int argc, char* argv[]) {
     std::shared_ptr<StatisticsReport> statistics;
+    //             std::this_thread::sleep_for(
+    //                 std::chrono::milliseconds(static_cast<int64_t>(7000)));
     try {
         ov::CompiledModel compiledModel;
 
@@ -1200,21 +1202,37 @@ int main(int argc, char* argv[]) {
         }
 
         if (FLAGS_api == "sync") {
-            inferRequest->infer();
+            try {
+                inferRequest->infer();
+            } catch(const std::exception& ex) {
+                slog::info << "Error infer: " << ex.what()  << '\n';
+            } catch(...) {
+                slog::info << "Unexpected exception\n";
+            }
         } else {
-            inferRequest->start_async();
+            try {
+                inferRequest->start_async();
+            } catch(const std::exception& ex) {
+                slog::info << "Error async infer: " << ex.what()  << '\n';
+            }
         }
 
+        // what if i add here a sleep call?
+        std::cout << "first wait all\n";
         inferRequestsQueue.wait_all();
+        std::cout << "after first wait_all\n";
 
+        std::cout << "get_latencies\n";
         auto duration_ms = inferRequestsQueue.get_latencies()[0];
         slog::info << "First inference took " << double_to_string(duration_ms) << " ms" << slog::endl;
 
         if (statistics) {
+            std::cout << "statistics->add_parameters()\n";
             statistics->add_parameters(
                 StatisticsReport::Category::EXECUTION_RESULTS,
                 {StatisticsVariant("first inference time (ms)", "first_inference_time", duration_ms)});
         }
+        std::cout << "reset times\n";
         inferRequestsQueue.reset_times();
 
         size_t processedFramesN = 0;
@@ -1227,12 +1245,14 @@ int main(int argc, char* argv[]) {
         while ((niter != 0LL && iteration < niter) ||
                (duration_nanoseconds != 0LL && (uint64_t)execTime < duration_nanoseconds) ||
                (FLAGS_api == "async" && iteration % nireq != 0)) {
+                std::cout << "get idle request\n";
             inferRequest = inferRequestsQueue.get_idle_request();
             if (!inferRequest) {
                 OPENVINO_THROW("No idle Infer Requests!");
             }
 
             if (!inferenceOnly) {
+                std::cout << "not inference only\n";
                 auto inputs = app_inputs_info[iteration % app_inputs_info.size()];
 
                 if (FLAGS_pcseq) {
@@ -1259,9 +1279,20 @@ int main(int argc, char* argv[]) {
             }
 
             if (FLAGS_api == "sync") {
-                inferRequest->infer();
+                try {
+                    inferRequest->infer();
+                } catch(const std::exception& ex) {
+                    slog::info << "Error infer: " << ex.what()  << '\n';
+                } catch(...) {
+                    slog::info << "Unexpected exception\n";
+                }
             } else {
-                inferRequest->start_async();
+                std::cout << "second sync wave\n";
+                try {
+                    inferRequest->start_async();
+                } catch(const std::exception& ex) {
+                    slog::info << "Error async infer: " << ex.what()  << '\n';
+                }
             }
             ++iteration;
 
@@ -1275,6 +1306,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        std::cout << "wait all\n";
         // wait the latest inference executions
         inferRequestsQueue.wait_all();
 

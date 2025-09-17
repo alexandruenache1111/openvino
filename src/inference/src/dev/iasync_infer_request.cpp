@@ -109,6 +109,7 @@ std::vector<ov::SoPtr<ov::IVariableState>> ov::IAsyncInferRequest::query_state()
 }
 
 void ov::IAsyncInferRequest::infer_thread_unsafe() {
+    std::cout << "infer_thread_unsafe()\n";
     run_first_stage(m_sync_pipeline.begin(), m_sync_pipeline.end(), m_sync_callback_executor);
 }
 
@@ -119,15 +120,18 @@ void ov::IAsyncInferRequest::start_async_thread_unsafe() {
 void ov::IAsyncInferRequest::run_first_stage(const Pipeline::iterator itBeginStage,
                                              const Pipeline::iterator itEndStage,
                                              const std::shared_ptr<ov::threading::ITaskExecutor> callbackExecutor) {
+                                                std::cout << "run_first_stage\n";
     auto& firstStageExecutor = std::get<Stage_e::EXECUTOR>(*itBeginStage);
     OPENVINO_ASSERT(nullptr != firstStageExecutor);
     firstStageExecutor->run(make_next_stage_task(itBeginStage, itEndStage, std::move(callbackExecutor)));
+    std::cout << "first stage end\n";
 }
 
 ov::threading::Task ov::IAsyncInferRequest::make_next_stage_task(
     const Pipeline::iterator itStage,
     const Pipeline::iterator itEndStage,
     const std::shared_ptr<ov::threading::ITaskExecutor> callbackExecutor) {
+        std::cout << "make_next_stage_task\n";
     return std::bind(
         [this, itStage, itEndStage](std::shared_ptr<ov::threading::ITaskExecutor>& callbackExecutor) mutable {
             std::exception_ptr currentException = nullptr;
@@ -186,7 +190,9 @@ ov::threading::Task ov::IAsyncInferRequest::make_next_stage_task(
 }
 
 void ov::IAsyncInferRequest::start_async() {
+    std::cout << "before infer_impl\n";
     infer_impl([this] {
+        std::cout << "before start_async_unsafe\n";
         start_async_thread_unsafe();
     });
 }
@@ -259,6 +265,7 @@ void ov::IAsyncInferRequest::stop_and_wait() {
 void ov::IAsyncInferRequest::infer() {
     DisableCallbackGuard disableCallbackGuard{this};
     infer_impl([this] {
+        std::cout << "infer_thread_unsafe()\n";
         infer_thread_unsafe();
     });
     wait();

@@ -76,7 +76,9 @@ public:
     void operator=(const ZeroApi&) = delete;
     void operator=(ZeroApi&&) = delete;
 
-    ~ZeroApi() = default;
+    ~ZeroApi() {
+        std::cout << "destructor api\n";
+    };
 
     static const std::shared_ptr<ZeroApi>& getInstance();
 
@@ -92,10 +94,11 @@ private:
 #define symbol_statement(symbol)                                                                            \
     template <typename... Args>                                                                             \
     inline typename std::invoke_result<decltype(&::symbol), Args...>::type wrapped_##symbol(Args... args) { \
-        const auto& ptr = ZeroApi::getInstance();                                                           \
+        const auto& ptr = std::make_shared<ZeroApi>();                                                           \
         if (ptr->symbol == nullptr) {                                                                       \
             OPENVINO_THROW("Unsupported symbol " #symbol);                                                  \
         }                                                                                                   \
+        std::cout << ptr->symbol << '\n';\
         return ptr->symbol(std::forward<Args>(args)...);                                                    \
     }
 symbols_list();

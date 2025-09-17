@@ -220,6 +220,7 @@ Tensor InferRequest::get_output_tensor() {
 }
 
 void InferRequest::infer() {
+    std::cout << "before call statement infer()\n";
     OV_INFER_REQ_CALL_STATEMENT(_impl->infer());
 }
 
@@ -232,6 +233,7 @@ std::vector<ProfilingInfo> InferRequest::get_profiling_info() const {
 }
 
 void InferRequest::start_async() {
+    std::cout << "before call statement\n";
     OV_INFER_REQ_CALL_STATEMENT(_impl->start_async());
 }
 
