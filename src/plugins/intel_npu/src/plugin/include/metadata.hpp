@@ -263,7 +263,7 @@ std::unique_ptr<MetadataBase> create_metadata(uint32_t version, uint64_t blobSiz
  * @return If the blob is versioned and its major version is supported, returns an unique pointer to the read
  * MetadataBase object; otherwise, returns 'nullptr'.
  */
-std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream);
+std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, bool skipCompatibility);
 
 /**
  * @brief Reads metadata from a blob (ov::Tensor).
@@ -271,6 +271,6 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream);
  * @return If the blob is versioned and its major version is supported, returns an unique pointer to the read
  * MetadataBase object; otherwise, returns 'nullptr'.
  */
-std::unique_ptr<MetadataBase> read_metadata_from(const ov::Tensor& tensor);
+std::unique_ptr<MetadataBase> read_metadata_from(const ov::Tensor& tensor, bool skipCompatibility);
 
 }  // namespace intel_npu

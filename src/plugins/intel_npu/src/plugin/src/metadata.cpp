@@ -205,7 +205,7 @@ std::streampos MetadataBase::getFileSize(std::istream& stream) {
     return streamEnd - streamStart;
 }
 
-std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
+std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, bool skipCompatibility) {
     size_t magicBytesSize = MAGIC_BYTES.size();
     std::string blobMagicBytes;
     blobMagicBytes.resize(magicBytesSize);
@@ -214,6 +214,9 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
     stream.seekg(streamSize - std::streampos(magicBytesSize), std::ios::cur);
     stream.read(blobMagicBytes.data(), magicBytesSize);
     if (MAGIC_BYTES != blobMagicBytes) {
+        if (skipCompatibility) {
+            return nullptr;
+        }
         OPENVINO_THROW("Blob is missing NPU metadata!");
     }
 
@@ -230,6 +233,9 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
         storedMeta = create_metadata(metaVersion, blobDataSize);
         storedMeta->read(stream);
     } catch (const std::exception& ex) {
+        if (skipCompatibility) {
+            return nullptr;
+        }
         OPENVINO_THROW(ex.what(),
                        "Imported blob metadata version: ",
                        MetadataBase::get_major(metaVersion),
@@ -247,12 +253,15 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream) {
     return storedMeta;
 }
 
-std::unique_ptr<MetadataBase> read_metadata_from(const ov::Tensor& tensor) {
+std::unique_ptr<MetadataBase> read_metadata_from(const ov::Tensor& tensor, bool skipCompatibility) {
     size_t magicBytesSize = MAGIC_BYTES.size();
     std::string_view blobMagicBytes(tensor.data<const char>() + tensor.get_byte_size() - magicBytesSize,
                                     magicBytesSize);
 
     if (MAGIC_BYTES != blobMagicBytes) {
+        if (skipCompatibility) {
+            return nullptr;
+        }
         OPENVINO_THROW("Blob is missing NPU metadata!");
     }
 
@@ -271,6 +280,9 @@ std::unique_ptr<MetadataBase> read_metadata_from(const ov::Tensor& tensor) {
         storedMeta = create_metadata(metaVersion, blobDataSize);
         storedMeta->read(roiTensor);
     } catch (const std::exception& ex) {
+        if (skipCompatibility) {
+            return nullptr;
+        }
         OPENVINO_THROW(ex.what(),
                        "Imported blob metadata version: ",
                        MetadataBase::get_major(metaVersion),

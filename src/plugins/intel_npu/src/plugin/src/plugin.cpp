@@ -730,14 +730,15 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
             npu_plugin_properties[DISABLE_VERSION_CHECK::key().data()].as<bool>() == true;
         std::unique_ptr<MetadataBase> metadata = nullptr;
         size_t blobSize = MetadataBase::getFileSize(stream);
+
+        metadata = read_metadata_from(stream, skipCompatibility);
         if (!skipCompatibility) {
-            // Read only metadata from the stream and check if blob is compatible. Load blob into memory only in case it
-            // passes compatibility checks.
-            metadata = read_metadata_from(stream);
             if (!metadata->is_compatible()) {
                 OPENVINO_THROW("Incompatible blob version!");
             }
             blobSize = metadata->get_blob_size();
+        } else {
+            _logger.info("Blob compatibility check skipped.");
         }
         ov::Allocator customAllocator{utils::AlignedAllocator{utils::STANDARD_PAGE_SIZE}};
         ov::Tensor tensor(ov::element::u8, ov::Shape{blobSize}, customAllocator);
@@ -786,7 +787,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& compi
         std::unique_ptr<MetadataBase> metadata = nullptr;
         size_t blobSize = compiled_blob.get_byte_size();
         if (!skipCompatibility) {
-            metadata = read_metadata_from(compiled_blob);
+            metadata = read_metadata_from(compiled_blob, skipCompatibility);
             if (!metadata->is_compatible()) {
                 OPENVINO_THROW("Incompatible blob version!");
             }
@@ -885,10 +886,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::parse(const ov::Tensor& tensorBig,
         mainSize = initSizes.has_value()
                        ? metadata->get_blob_size() - std::accumulate(initSizes->begin(), initSizes->end(), accumulator)
                        : metadata->get_blob_size();
-    } else {
-        _logger.info("Blob compatibility check skipped.");
     }
-
     ov::Tensor tensorMain(tensorBig,
                           ov::Coordinate{0},
                           ov::Coordinate{mainSize});  // ROI tensor to skip NPU plugin metadata
