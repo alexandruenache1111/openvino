@@ -215,6 +215,7 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, bool skip
     stream.read(blobMagicBytes.data(), magicBytesSize);
     if (MAGIC_BYTES != blobMagicBytes) {
         if (skipCompatibility) {
+            stream.seekg(-stream.tellg() + currentStreamPos, std::ios::cur);
             return nullptr;
         }
         OPENVINO_THROW("Blob is missing NPU metadata!");
@@ -234,6 +235,7 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream, bool skip
         storedMeta->read(stream);
     } catch (const std::exception& ex) {
         if (skipCompatibility) {
+            stream.seekg(-stream.tellg() + currentStreamPos, std::ios::cur);
             return nullptr;
         }
         OPENVINO_THROW(ex.what(),

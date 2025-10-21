@@ -786,12 +786,15 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& compi
             npu_plugin_properties[DISABLE_VERSION_CHECK::key().data()].as<bool>() == true;
         std::unique_ptr<MetadataBase> metadata = nullptr;
         size_t blobSize = compiled_blob.get_byte_size();
+
+        metadata = read_metadata_from(compiled_blob, skipCompatibility);
         if (!skipCompatibility) {
-            metadata = read_metadata_from(compiled_blob, skipCompatibility);
             if (!metadata->is_compatible()) {
                 OPENVINO_THROW("Incompatible blob version!");
             }
             blobSize = metadata->get_blob_size();
+        } else {
+            _logger.info("Blob compatibility check skipped.");
         }
         const ov::Tensor roiTensor(compiled_blob,
                                    ov::Coordinate{0},
