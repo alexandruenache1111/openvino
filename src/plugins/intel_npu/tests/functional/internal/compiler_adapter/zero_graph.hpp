@@ -51,8 +51,6 @@ public:
 
     std::shared_ptr<driver_compiler_utils::IRSerializer> irSerializer;
 
-    std::string blobPath;
-
     int extVersion;
 
     int graphDescFlag;
@@ -78,6 +76,27 @@ public:
         serializedIR = irSerializer->serializeIR(model, compilerVersion, maxOpsetVersion);
     }
 
+    std::tuple<void*, size_t> make_blob() {
+        void* blob = nullptr;
+        size_t alignedSize = 0;
+        // use local zeGraphExt;
+        auto localZeGraphExt = std::make_shared<ZeGraphExtWrappers>(zeroInitStruct);
+        GraphDescriptor localGraphDescriptor = nullptr;
+        serializeIR();
+        localGraphDescriptor = localZeGraphExt->getGraphDescriptor(serializedIR, "", graphDescFlag);
+        const uint8_t* blobPtr = nullptr;
+        std::vector<uint8_t> blobVec;  // plugin needs to keep a copy of the blob for older drivers
+        size_t blobSize = 0;
+        localZeGraphExt->getGraphBinary(localGraphDescriptor, blobVec, blobPtr, blobSize);
+
+        alignedSize = calculate_size_with_alignment_padding(blobSize, ::utils::STANDARD_PAGE_SIZE);
+        blob = ::operator new(alignedSize, std::align_val_t(::utils::STANDARD_PAGE_SIZE));
+        std::memcpy(blob, blobPtr, blobSize);
+        localZeGraphExt->destroyGraph(localGraphDescriptor);
+
+        return std::make_tuple(blob, alignedSize);
+    }
+
 protected:
     void SetUp() override {
         using namespace ::driver_compiler_utils;
@@ -85,9 +104,6 @@ protected:
         SKIP_IF_CURRENT_TEST_IS_DISABLED();
 
         std::tie(graphDescFlag, extVersion) = GetParam();
-
-        const std::string BLOB_NAME = "blob_compatibility_dummy_model_MTL_ov_2025_1_0_driver_1003967.blob";
-        blobPath = ov::test::utils::NpuTestEnvConfig::getInstance().OV_NPU_TESTS_BLOBS_PATH + BLOB_NAME;
 
         model = ov::test::utils::make_multi_single_conv();
 
@@ -139,15 +155,12 @@ TEST_P(ZeroGraphCompilationTests, GetInitSetArgsDestroyGraphAlignedMemoryIR) {
 }
 
 TEST_P(ZeroGraphTest, GetGraphInitBlob) {
-    std::ifstream blobStream(blobPath, std::ios::binary | std::ios::in);
-    ASSERT_TRUE(blobStream.is_open());
-    size_t size = get_file_size(blobStream);
+    void* blob = nullptr;
+    size_t alignedSize;
 
-    std::vector<uint8_t> blob(size);
-    blobStream.read(reinterpret_cast<char*>(blob.data()), size);
-    blobStream.close();
+    OV_ASSERT_NO_THROW(std::tie(blob, alignedSize) = make_blob());
 
-    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob.data(), blob.size()));
+    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob, alignedSize));
 
     uint32_t initCommandQueueOrdinal = 0;
     OV_ASSERT_NO_THROW(initCommandQueueOrdinal =
@@ -169,15 +182,12 @@ TEST_P(ZeroGraphTest, QueryGraph) {
 }
 
 TEST_P(ZeroGraphTest, GetGraphBinary) {
-    std::ifstream blobStream(blobPath, std::ios::binary | std::ios::in);
-    ASSERT_TRUE(blobStream.is_open());
-    size_t size = get_file_size(blobStream);
+    void* blob = nullptr;
+    size_t alignedSize;
 
-    std::vector<uint8_t> blob(size);
-    blobStream.read(reinterpret_cast<char*>(blob.data()), size);
-    blobStream.close();
+    OV_ASSERT_NO_THROW(std::tie(blob, alignedSize) = make_blob());
 
-    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob.data(), blob.size()));
+    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob, alignedSize));
 
     uint32_t initCommandQueueOrdinal = 0;
     OV_ASSERT_NO_THROW(initCommandQueueOrdinal =
@@ -186,7 +196,8 @@ TEST_P(ZeroGraphTest, GetGraphBinary) {
     OV_ASSERT_NO_THROW(zeGraphExt->initializeGraph(graphDescriptor, initCommandQueueOrdinal));
 
     const uint8_t* blobPtr = nullptr;
-    OV_ASSERT_NO_THROW(zeGraphExt->getGraphBinary(graphDescriptor, blob, blobPtr, size));
+    std::vector<uint8_t> blobVec;
+    OV_ASSERT_NO_THROW(zeGraphExt->getGraphBinary(graphDescriptor, blobVec, blobPtr, alignedSize));
 }
 
 TEST_P(ZeroGraphTest, SetGraphArgOnNullBuffer) {
@@ -204,16 +215,12 @@ TEST_P(ZeroGraphTest, SetGraphArgOnNullBuffer) {
 }
 
 TEST_P(ZeroGraphTest, GetInitSetArgsDestroyGraphAlignedMemoryMallocBlob) {
-    std::ifstream blobStream(blobPath, std::ios::binary | std::ios::in);
-    ASSERT_TRUE(blobStream.is_open());
-    size_t size = get_file_size(blobStream);
-    size = calculate_size_with_alignment_padding(size, ::utils::STANDARD_PAGE_SIZE);
+    void* blob = nullptr;
+    size_t alignedSize;
 
-    uint8_t* blob = static_cast<uint8_t*>(::operator new(size, std::align_val_t(::utils::STANDARD_PAGE_SIZE)));
-    blobStream.read(reinterpret_cast<char*>(blob), size);
-    blobStream.close();
+    OV_ASSERT_NO_THROW(std::tie(blob, alignedSize) = make_blob());
 
-    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob, size));
+    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob, alignedSize));
 
     uint32_t initCommandQueueOrdinal = 0;
     OV_ASSERT_NO_THROW(initCommandQueueOrdinal =
@@ -222,7 +229,7 @@ TEST_P(ZeroGraphTest, GetInitSetArgsDestroyGraphAlignedMemoryMallocBlob) {
     OV_ASSERT_NO_THROW(zeGraphExt->initializeGraph(graphDescriptor, initCommandQueueOrdinal));
 
     std::unique_ptr<ZeroMem> buffer;
-    OV_ASSERT_NO_THROW(buffer = std::make_unique<ZeroMem>(zeroInitStruct, size, ::utils::STANDARD_PAGE_SIZE, false));
+    OV_ASSERT_NO_THROW(buffer = std::make_unique<ZeroMem>(zeroInitStruct, alignedSize, ::utils::STANDARD_PAGE_SIZE, false));
 
     OV_ASSERT_NO_THROW(zeGraphExt->setGraphArgumentValue(graphDescriptor, 0, buffer->data()));
 
@@ -230,15 +237,12 @@ TEST_P(ZeroGraphTest, GetInitSetArgsDestroyGraphAlignedMemoryMallocBlob) {
 }
 
 TEST_P(ZeroGraphTest, GetInitSetArgsDestroyGraphNotAlignedMemoryMallocBlob) {
-    std::ifstream blobStream(blobPath, std::ios::binary | std::ios::in);
-    ASSERT_TRUE(blobStream.is_open());
-    size_t size = get_file_size(blobStream);
+    void* blob = nullptr;
+    size_t alignedSize;
 
-    uint8_t* blob = static_cast<uint8_t*>(::operator new(size, std::align_val_t(::utils::STANDARD_PAGE_SIZE)));
-    blobStream.read(reinterpret_cast<char*>(blob), size);
-    blobStream.close();
+    OV_ASSERT_NO_THROW(std::tie(blob, alignedSize) = make_blob());
 
-    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob, size));
+    OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob, alignedSize));
 
     uint32_t initCommandQueueOrdinal = 0;
     OV_ASSERT_NO_THROW(initCommandQueueOrdinal =
@@ -247,7 +251,7 @@ TEST_P(ZeroGraphTest, GetInitSetArgsDestroyGraphNotAlignedMemoryMallocBlob) {
     OV_ASSERT_NO_THROW(zeGraphExt->initializeGraph(graphDescriptor, initCommandQueueOrdinal));
 
     std::unique_ptr<ZeroMem> buffer;
-    OV_ASSERT_NO_THROW(buffer = std::make_unique<ZeroMem>(zeroInitStruct, size, ::utils::STANDARD_PAGE_SIZE, false));
+    OV_ASSERT_NO_THROW(buffer = std::make_unique<ZeroMem>(zeroInitStruct, alignedSize, ::utils::STANDARD_PAGE_SIZE, false));
 
     OV_ASSERT_NO_THROW(zeGraphExt->setGraphArgumentValue(graphDescriptor, 0, static_cast<char*>(buffer->data()) + 1));
 
@@ -329,22 +333,8 @@ TEST_P(ZeroGraphTest, SetAlignedBlob) {
     // create blob -> compile model first
     void* blob = nullptr;
     size_t alignedSize;
-    {
-        // use local zeGraphExt;
-        auto localZeGraphExt = std::make_shared<ZeGraphExtWrappers>(zeroInitStruct);
-        GraphDescriptor localGraphDescriptor;
-        serializeIR();
-        OV_ASSERT_NO_THROW(localGraphDescriptor = localZeGraphExt->getGraphDescriptor(serializedIR, "", graphDescFlag));
-        const uint8_t* blobPtr = nullptr;
-        std::vector<uint8_t> blobVec;  // plugin needs to keep a copy of the blob for older drivers
-        size_t blobSize;
-        OV_ASSERT_NO_THROW(localZeGraphExt->getGraphBinary(localGraphDescriptor, blobVec, blobPtr, blobSize));
-
-        alignedSize = calculate_size_with_alignment_padding(blobSize, ::utils::STANDARD_PAGE_SIZE);
-        blob = ::operator new(alignedSize, std::align_val_t(::utils::STANDARD_PAGE_SIZE));
-        std::memcpy(blob, blobPtr, blobSize);
-        localZeGraphExt->destroyGraph(localGraphDescriptor);
-    }
+    
+    OV_ASSERT_NO_THROW(std::tie(blob, alignedSize) = make_blob());
 
     OV_ASSERT_NO_THROW(graphDescriptor = zeGraphExt->getGraphDescriptor(blob, alignedSize));
     uint32_t initCommandQueueOrdinal = 0;
