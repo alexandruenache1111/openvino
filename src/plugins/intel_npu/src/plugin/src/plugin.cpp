@@ -786,16 +786,12 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, c
         std::unique_ptr<MetadataBase> metadata = nullptr;
         size_t blobSize = MetadataBase::getFileSize(stream);
 
-        metadata = read_metadata_from(stream);
-
         if (!skipCompatibility) {
-            if (!metadata->is_compatible()) {
-                OPENVINO_THROW("Incompatible blob version!");
-            }
+            metadata = read_metadata_from(stream);
+            blobSize = metadata->get_blob_size();
         } else {
             _logger.info("Blob compatibility check skipped.");
         }
-        blobSize = metadata->get_blob_size();
 
         ov::Allocator customAllocator{utils::AlignedAllocator{utils::STANDARD_PAGE_SIZE}};
         ov::Tensor tensor(ov::element::u8, ov::Shape{blobSize}, customAllocator);
@@ -844,12 +840,8 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& compi
         std::unique_ptr<MetadataBase> metadata = nullptr;
         size_t blobSize = compiled_blob.get_byte_size();
 
-        metadata = read_metadata_from(stream);
-
         if (!skipCompatibility) {
-            if (!metadata->is_compatible()) {
-                OPENVINO_THROW("Incompatible blob version!");
-            }
+            metadata = read_metadata_from(stream);
             blobSize = metadata->get_blob_size();
         } else {
             _logger.info("Blob compatibility check skipped.");
