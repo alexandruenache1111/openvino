@@ -841,7 +841,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& compi
         size_t blobSize = compiled_blob.get_byte_size();
 
         if (!skipCompatibility) {
-            metadata = read_metadata_from(stream);
+            metadata = read_metadata_from(compiled_blob);
             blobSize = metadata->get_blob_size();
         } else {
             _logger.info("Blob compatibility check skipped.");
