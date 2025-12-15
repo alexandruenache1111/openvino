@@ -139,11 +139,12 @@ constexpr uint32_t METADATA_VERSION_2_0{MetadataBase::make_version(2, 0)};
 constexpr uint32_t METADATA_VERSION_2_1{MetadataBase::make_version(2, 1)};
 constexpr uint32_t METADATA_VERSION_2_2{MetadataBase::make_version(2, 2)};
 constexpr uint32_t METADATA_VERSION_2_3{MetadataBase::make_version(2, 3)};
+constexpr uint32_t METADATA_VERSION_3_0{MetadataBase::make_version(3, 0)};
 
 /**
  * @brief Current metadata version.
  */
-constexpr uint32_t CURRENT_METADATA_VERSION{METADATA_VERSION_2_3};
+constexpr uint32_t CURRENT_METADATA_VERSION{METADATA_VERSION_3_0};
 
 constexpr uint16_t CURRENT_METADATA_MAJOR_VERSION{MetadataBase::get_major(CURRENT_METADATA_VERSION)};
 constexpr uint16_t CURRENT_METADATA_MINOR_VERSION{MetadataBase::get_minor(CURRENT_METADATA_VERSION)};
@@ -334,6 +335,26 @@ private:
 };
 
 /**
+ * @brief The version which brings the new capability system.
+ */
+template <>
+class Metadata<METADATA_VERSION_3_0> : public MetadataBase {
+public:
+    Metadata(uint64_t blobSize, const std::optional<OpenvinoVersion>& ovVersion = std::nullopt);
+
+    void read() override;
+
+    void write(std::ostream& stream) override;
+
+    size_t get_metadata_size() const override;
+
+    bool is_compatible() override;
+
+protected:
+    OpenvinoVersion _ovVersion;
+};
+
+/**
  * @brief Creates a Metadata object.
  *
  * @return Unique pointer to the created MetadataBase object if the major version is supported; otherwise, returns
@@ -356,5 +377,189 @@ std::unique_ptr<MetadataBase> read_metadata_from(std::istream& stream);
  * MetadataBase object; otherwise, returns 'nullptr'.
  */
 std::unique_ptr<MetadataBase> read_metadata_from(const ov::Tensor& tensor);
+
+// struct Header {
+//     int64_t type;
+//     bool required;
+//     int64_t length;
+
+//     Header(int64_t type, bool required, int64_t length) : type(type), required(required), length(length) {}
+
+//     Header(int64_t type, bool required) : type(type), required(required) {
+//         length = 0xDEADBEEF;
+//     }
+
+//     void write(std::ostream& stream);
+
+//     void read(std::ostream& stream);
+// };
+
+// struct ICapability {
+//     int64_t type;
+//     int64_t length;
+//     // bool required;
+
+//     virtual void write(std::ostream& stream) = 0;
+
+//     virtual void read(std::istream& stream) = 0;
+
+//     // virtual void get_size() = 0;
+// };
+
+// struct OrGroup : ICapability {
+//     std::vector<ICapability> group;
+
+//     void read_value(std::istream& stream) override {
+//         stream.read(groupSize);
+
+//         group.reserve(groupSize);
+
+//         for (int i = 0; i < groupSize; i++) {
+//             readCapabilities(stream, group);
+//         }
+//     }
+
+//     OrGroup(std::vector<ICapability> caps) group(std::move(caps)) {
+//         type = OR_GROUP;
+//         length = sizeof(group.size());
+//         for (auto cap : group) {
+//             length += sizeof(type) + sizeof(length); // header size
+//             length += cap.length; // payload length
+//         }
+//     }
+
+//     void write(std::ostream& stream) override {
+//         stream.write(type);
+//         stream.write(length);
+        
+//         stream.write(group.size());
+
+//         for (auto cap : group) {
+//             cap.write(stream);
+//         }
+//     }
+
+//     bool isSupported() {
+//         for (auto cap : group) {
+//             if (cap.isSupported()) {
+//                 return true;
+//             }
+//         }
+//         return false;
+//     }
+// };
+
+// // no idea how to represent this atm
+// struct CapabilityExpression : ICapability {
+//     std::string expression;
+
+//     // some constructor
+
+//     void write(std::ostream& stream) override;
+
+//     void read(std::istream& stream) override;
+
+//     bool isCompatible(); // ?
+// };
+
+// struct CapabilityELFBlob : ICapability {
+//     std::shared_ptr<IGraph> graph;
+
+//     explicit CapabilityELFBlob(std::shared_ptr<IGraph> graph) : graph(graph) {
+//         type = ELF_BLOB;
+//         length = get_size(graph);
+//     }
+
+//     void write(std::ostream& stream) override {
+//         stream.write(type);
+//         stream.write(length);
+
+//         graph->export_blob(stream);
+//     }
+
+//     CapabilityELFBlob(int64_t type, int64_t lengt) type(type), length(length) {}
+
+//     void read_value(std::istream& stream) override {
+//         std::vector<uint8_t*> blob;
+//         blob.reserve(length);
+//         stream.read(blob.data(), length);
+//     }
+// };
+
+// struct CapabilityWeightsSeparation : ICapability {
+//     // uint64_t numSizes; // technically speaking, this is an auxiliary field since it is used only for read/write
+//     // std::vector<uint64_t> numInits;
+//     std::vector<CapabilityELFBlob> blobs;
+
+//     explicit CapabilityWeightsSeparation(std::vector<uint64_t>& numInits) : numInits(std::move(numInits)) {}
+
+//     void write(std::ostream& stream) override {
+//         stream.write(type);
+//         stream.write(length);
+
+//         stream.write(blobs.size());
+
+//         for(int i = 0; i < blobs.size(); i++) {
+//             blobs[i].write(stream);
+//         }
+//     }
+
+//     void read_value(std::istream& stream) override {
+//         stream.read(numBlobs);
+
+//         blobs.reserve(numBlobs);
+
+//         for (int i = 0; i < numBlobs; i++) {
+//             stream.read(tag_i);
+//             stream.read(length_i);
+
+//             auto cap = CapabilityELFBlob(tag_i, length_i);
+//             cap.read_value(stream);
+//             blobs[i] = cap;
+//         }
+//     }
+// };
+
+// struct CapabilityBatchSize : ICapability {
+//     uint64_t batchSize;
+
+//     explicit CapabilityBatchSize(uint64_t batchSize) : batchSize(batchSize) {
+//         type = BS;
+//         length = sizeof(batchSize);
+//     }
+
+//     CapabilityBatchSize() {
+//         type = BS;
+//         length = sizeof(batchSize);
+//     }
+
+//     void write(std::ostream& stream) override {
+//         stream.write(type);
+//         stream.write(length);
+
+//         stream.write(batchSize);
+//     }
+
+//     void read_value(std::istream& stream) override {
+//         stream.read(&batchSize, sizeof(batchSize));
+//     }
+// };
+
+// struct CapabilityInputOutputLayouts : ICapability {
+//     std::vector<ov::Layout> inputs;
+//     std::vector<ov::Layout> outputs;
+
+//     // some constructor here
+
+//     void write(std::ostream& stream) override;
+
+//     void read(std::istream& stream) override;
+// };
+
+// template <typename T>
+// struct CustomSerializer {
+//     void write(std::ostream& stream, const T& obj);
+// };
+
 
 }  // namespace intel_npu

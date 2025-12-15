@@ -192,6 +192,7 @@ void Metadata<METADATA_VERSION_2_3>::read() {
 
             try {
                 layouts->push_back(ov::Layout(std::move(layoutString)));
+                std::cout << "\"" << layoutString << "\"" << ", ";
             } catch (const ov::Exception&) {
                 _logger.warning("Error encountered while constructing an ov::Layout object. %s index: %d. Value "
                                 "read from blob: %s. A default value will be used instead.",
@@ -204,7 +205,9 @@ void Metadata<METADATA_VERSION_2_3>::read() {
         return layouts;
     };
 
+    std::cout << "inputs: \n";
     _inputLayouts = readNLayouts(numberOfInputLayouts, "Input");
+    std::cout << "outputs: \n";
     _outputLayouts = readNLayouts(numberOfOutputLayouts, "Output");
 }
 
@@ -469,5 +472,152 @@ size_t Metadata<METADATA_VERSION_2_3>::get_metadata_size() const {
 
     return metadataSize;
 }
+
+// std::vector<ICapability> caps;
+
+// void readCapabilities(std::istream& stream, std::vector<ICapability>& caps) {
+//     while (!stream.end()) {
+//         stream.read(tag);
+//         stream.read(length);
+
+//         switch (tag) {
+//             case ELFBlob:
+//                 auto cap = CapabilityELFBlob(tag, length);
+//                 cap.read_value(stream);
+//                 caps[tag] = cap;
+//                 break;
+
+//             case BS:
+//                 auto cap = CapabilityBatchSize();
+//                 cap.read_value(stream);
+//                 caps[tag] = cap;
+//                 break;
+
+//             case WS:
+//                 auto cap = CapabilityWeightsSeparation(tag, length);
+//                 cap.read_value(stream);
+//                 caps[tag] = cap;
+//                 break;
+
+//             case OR_GROUP:
+//                 auto cap = OrGroup(tag, length);
+//                 cap.read_value(stream);
+//                 caps[tag] = cap;
+//                 break;
+
+//             default:
+//                 // unknown property found
+//                 // jump to the next one since we know the length from header
+//                 caps[tag] = UnknownCapability(-1, length);
+//                 break;
+//         }
+//     }
+// }
+
+// bool eval(caps) {
+//     for (auto cap : caps) {
+//         // required or not might count in decision
+//         // UnknownCapability::isSupported() -> always false
+//         if (!cap.isSupported()) {
+//             return false;
+//         }
+//     }
+// }
+
+// void writeCapabilities(std::ostream& stream) {
+//     for (auto cap : caps) {
+//         cap.write(stream);
+//     }
+// }
+
+// struct ELFBlob {
+    
+
+// };
+
+
+// void Header::write(std::ostream& stream) {
+//     stream.write(header.data(), header.size()); 
+// }
+
+// template <typename T>
+// void serializeVectorPOD(std::ostream& stream, const std::vector<T>& vec) {
+//     stream.write(vec.size(), sizeof(vec.size()));
+//     stream.write(vec.data(), vec.size());
+// }
+
+// template <typename T>
+// void serializeVectorCustom(std::ostream& stream, const std::vector<T>& vec) {
+//     // do some static checks to see if the T type actually has an existing serialize method?
+
+//     // what to do in the case of string since its not OUR non-POD type?
+//     // just make a wrapper of the std::string?
+//     CustomSerializer<T>::write(stream, vec);
+// }
+
+// template <typename T>
+// void serializeVector(std::ostream& stream, const std::vector<T>& vec) {
+//     if constexpr (isPOD) {
+//         serializeVectorPOD(stream, vec);
+//     } else {
+//         serializeVectorCustom<T>(stream, vec);
+//     }
+// }
+
+// using Layouts = std::tuple<std::vector<ov::Layout>, std::vector<ov::Layout>>;
+
+// template <>
+// void CustomSerializer<Layouts>::write(std::ostream& stream, const Layouts& obj) {
+//     std::vector<ov::Layout> _inputLayouts;
+//     std::vector<ov::Layout> _outputLayouts;
+//     std::tie(_inputLayouts, _outputLayouts) = obj;
+
+//     const uint64_t numberOfInputLayouts = _inputLayouts.has_value() ? _inputLayouts->size() : 0;
+//     const uint64_t numberOfOutputLayouts = _outputLayouts.has_value() ? _outputLayouts->size() : 0;
+//     stream.write(reinterpret_cast<const char*>(&numberOfInputLayouts), sizeof(numberOfInputLayouts));
+//     stream.write(reinterpret_cast<const char*>(&numberOfOutputLayouts), sizeof(numberOfOutputLayouts));
+
+//     const auto writeLayouts = [&](const std::optional<std::vector<ov::Layout>>& layouts) {
+//         if (layouts.has_value()) {
+//             for (const ov::Layout& layout : layouts.value()) {
+//                 const std::string layoutString = layout.to_string();
+//                 const uint16_t stringLength = static_cast<uint16_t>(layoutString.size());
+//                 stream.write(reinterpret_cast<const char*>(&stringLength), sizeof(stringLength));
+//                 stream.write(layoutString.c_str(), stringLength);
+//             }
+//         }
+//     };
+
+//     writeLayouts(_inputLayouts);
+//     writeLayouts(_outputLayouts);
+// }
+
+// void CapabilityExpression::write(std::ostream& stream) {
+//     // whatever in here
+// }
+
+// void CapabilityELFBlob::write(std::ostream& stream) {
+//     // delegate call to header write
+//     // BUT WAIT. header write cannot be called if the capability contains non-POD types.
+
+//     // issue: initBlobSizes MAY be needed by CapabilityWeightsSeparation
+//     auto [blobSizesBeforeVersioning, initBlobSizes] = graph->export_blob(stream);
+//     // second issue: the size of the blob is given AFTER the blob is written to stream
+//     // possible solution: use ir_serializer for a temp stream which can be concatenated to the big stream, copy-free?
+// }
+
+// void CapabilityWeightsSeparation::write(std::ostream& stream) {
+//     // header.write() but it is using non-POD types
+//     int64_t size = calculate_size_in_bytes(); // numInits.size() * sizeof(numInits[0]) + sizeof(numSizes);
+
+//     Header header(this->type, this->required, size);
+//     header.write(stream);
+
+//     stream.write(numSizes, sizeof(numSizes));
+
+//     serializeVector(stream, numInits);
+// }
+
+
 
 }  // namespace intel_npu
