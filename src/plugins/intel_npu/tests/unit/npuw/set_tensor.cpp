@@ -6,6 +6,7 @@
 
 #include <iostream>
 
+#include "intel_npu/utils/logger/logger.hpp"
 #include "model_generator/model_generator.hpp"
 #include "openvino/openvino.hpp"
 
@@ -117,6 +118,12 @@ TEST_P(SetTensorNPUW_RemoteTensorInputTests, RemoteTensorInput) {
     // Only run this test on NPU device
     ov::Core ov_core;
     ov::AnyMap configuration;
+    intel_npu::Logger::global().setLevel(ov::log::Level::DEBUG);
+#ifdef _WIN32
+    _putenv_s("OV_NPU_LOG_LEVEL", "LOG_DEBUG");
+#else
+    setenv("OV_NPU_LOG_LEVEL", "LOG_DEBUG", 1);
+#endif
     configuration[ov::log::level.name()] = ov::log::Level::DEBUG;
     ov_core.get_property("NPU", ov::hint::enable_cpu_pinning.name());
     ov_core.set_property("NPU", configuration);
