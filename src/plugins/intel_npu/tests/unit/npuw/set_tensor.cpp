@@ -6,8 +6,8 @@
 
 #include <iostream>
 
-#include "openvino/openvino.hpp"
 #include "model_generator/model_generator.hpp"
+#include "openvino/openvino.hpp"
 
 // FIXME: parametrize all the tests below
 
@@ -44,12 +44,10 @@ TEST(SetTensorNPUW, RemoteTensorOutputJust) {
     values.copy_to(output);
 
     // NPUW config
-    ov::AnyMap config = {
-        {"NPU_USE_NPUW", "YES"},
-        {"NPUW_FUNCALL_FOR_ALL", "YES"},
-        {"NPUW_DEVICES", "NPU"},
-        {"NPUW_FOLD" , "YES"}
-    };
+    ov::AnyMap config = {{"NPU_USE_NPUW", "YES"},
+                         {"NPUW_FUNCALL_FOR_ALL", "YES"},
+                         {"NPUW_DEVICES", "NPU"},
+                         {"NPUW_FOLD", "YES"}};
 
     // Compile NPUW
     auto compiled = ov_core.compile_model(model, device, config);
@@ -77,7 +75,7 @@ TEST(SetTensorNPUW, RemoteTensorOutputJust) {
     EXPECT_TRUE(check_non_zero(output_tensor, total_elements));
 }
 
-using RemoteTensorInputParams = std::tuple<ov::AnyMap>; // additional config to pick infer request class
+using RemoteTensorInputParams = std::tuple<ov::AnyMap>;  // additional config to pick infer request class
 
 class RemoteTensorInputTestsBase {
 protected:
@@ -98,8 +96,8 @@ public:
 
 template <class T>
 class RemoteTensorInputTestsTmpl : public ::testing::Test,
-                           public T,
-                           public ::testing::WithParamInterface<RemoteTensorInputParams> {
+                                   public T,
+                                   public ::testing::WithParamInterface<RemoteTensorInputParams> {
 protected:
     void SetUp() override {
         T::SetUp(GetParam());
@@ -118,6 +116,11 @@ using SetTensorNPUW_RemoteTensorInputTests = RemoteTensorInputTestsTmpl<RemoteTe
 TEST_P(SetTensorNPUW_RemoteTensorInputTests, RemoteTensorInput) {
     // Only run this test on NPU device
     ov::Core ov_core;
+    ov::AnyMap configuration;
+    configuration[ov::log::level.name()] = ov::log::Level::DEBUG;
+    ov_core.get_property("NPU", ov::hint::enable_cpu_pinning.name());
+    ov_core.set_property("NPU", configuration);
+    ov_core.get_property("NPU", ov::hint::enable_cpu_pinning.name());
     auto core_devices = ov_core.get_available_devices();
     if (std::find(core_devices.begin(), core_devices.end(), "NPU") == core_devices.end()) {
         GTEST_SKIP() << "No available devices.";
@@ -148,12 +151,10 @@ TEST_P(SetTensorNPUW_RemoteTensorInputTests, RemoteTensorInput) {
     values.copy_to(input);
 
     // NPUW config
-    ov::AnyMap config = {
-        {"NPU_USE_NPUW", "YES"},
-        {"NPUW_FUNCALL_FOR_ALL", "YES"},
-        {"NPUW_DEVICES", "NPU"},
-        {"NPUW_FOLD" , "YES"}
-    };
+    ov::AnyMap config = {{"NPU_USE_NPUW", "YES"},
+                         {"NPUW_FUNCALL_FOR_ALL", "YES"},
+                         {"NPUW_DEVICES", "NPU"},
+                         {"NPUW_FOLD", "YES"}};
 
     // Apply parametrized config
     for (const auto& el : extra_config) {
@@ -178,8 +179,10 @@ TEST_P(SetTensorNPUW_RemoteTensorInputTests, RemoteTensorInput) {
     EXPECT_EQ(input_tensor.data(), input.data());
 }
 
-const auto TestCases = ::testing::Combine(
-        ::testing::ValuesIn({ov::AnyMap{}, ov::AnyMap{{"NPUW_UNFOLD_IREQS", "YES"}}}));
+const auto TestCases =
+    ::testing::Combine(::testing::ValuesIn({ov::AnyMap{}, ov::AnyMap{{"NPUW_UNFOLD_IREQS", "YES"}}}));
 
-INSTANTIATE_TEST_SUITE_P(SetTensorNPUW_RemoteTensorInputTests, SetTensorNPUW_RemoteTensorInputTests,
-                         TestCases, SetTensorNPUW_RemoteTensorInputTests::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(SetTensorNPUW_RemoteTensorInputTests,
+                         SetTensorNPUW_RemoteTensorInputTests,
+                         TestCases,
+                         SetTensorNPUW_RemoteTensorInputTests::getTestCaseName);
