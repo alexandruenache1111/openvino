@@ -289,7 +289,6 @@ TEST(SerializationTest, OVTypes_Tensor_with_weights) {
 }
 
 TEST(SerializationTest, Stress_ParallelImport) {
-    // Only run this test on NPU device
     ov::Core ov_core;
     intel_npu::Logger::global().setLevel(ov::log::Level::DEBUG);
 #ifdef _WIN32
