@@ -222,9 +222,10 @@ ZeroInferRequest::FoundPort ZeroInferRequest::find_port(const ov::Output<const o
         ov::util::hash_combine({std::hash<const ov::Node*>()(port.get_node()), std::hash<size_t>()(port.get_index())});
     {
         std::lock_guard<std::mutex> lock(_cacheMutex);
-        if (_cachedPorts.find(port_hash) != _cachedPorts.end()) {
+        auto it = _cachedPorts.find(port_hash);
+        if (it != _cachedPorts.end()) {
             // Cached port for the hash was found
-            return _cachedPorts[port_hash];
+            return it->second;
         }
     }
     ZeroInferRequest::FoundPort::Type type = ZeroInferRequest::FoundPort::Type::INPUT;
@@ -237,8 +238,9 @@ ZeroInferRequest::FoundPort ZeroInferRequest::find_port(const ov::Output<const o
             if (ports[i].get_index() == port.get_index() && check_nodes(ports[i].get_node(), port.get_node()) &&
                 check_tensor_names(port.get_names(), ports[i].get_names())) {
                 std::lock_guard<std::mutex> lock(_cacheMutex);
-                _cachedPorts[port_hash] = {i, type};
-                return _cachedPorts[port_hash];
+                auto [it, inserted] = _cachedPorts.emplace(port_hash, FoundPort{i, type});
+                (void)inserted;
+                return it->second;
             }
         }
         type = ZeroInferRequest::FoundPort::Type::OUTPUT;
@@ -304,7 +306,7 @@ void ZeroInferRequest::setup_pipeline() {
         }
 
         if (get_level_zero_input(inputIndex)) {
-            if (_dynamicBatchValueChanged && batchSize.has_value() &&
+            if (_pipelineState == PipelineState::NeedsRecreation && batchSize.has_value() &&
                 get_level_zero_input(inputIndex)->get_shape()[utils::BATCH_AXIS] != batchSize.value()) {
                 OPENVINO_THROW("Input tensor ",
                                _metadata.inputs.at(inputIndex).nodeFriendlyName.c_str(),
@@ -326,7 +328,7 @@ void ZeroInferRequest::setup_pipeline() {
 
     for (size_t outputIndex = 0; outputIndex < _metadata.outputs.size(); ++outputIndex) {
         if (_levelZeroOutputTensors.at(outputIndex)) {
-            if (_dynamicBatchValueChanged) {
+            if (_pipelineState == PipelineState::NeedsRecreation) {
                 if (batchSize.has_value() &&
                     _levelZeroOutputTensors.at(outputIndex)->get_shape()[utils::BATCH_AXIS] == batchSize.value()) {
                     _logger.debug("setup_pipeline - tensor %s was already allocated",
@@ -344,7 +346,7 @@ void ZeroInferRequest::setup_pipeline() {
 
         _levelZeroOutputTensors.at(outputIndex) = allocate_tensor(outputIndex, OUTPUT, batchSize);
 
-        if (_dynamicBatchValueChanged && !_userOutputTensors.at(outputIndex)->get_shape().empty() &&
+        if (_pipelineState == PipelineState::NeedsRecreation && !_userOutputTensors.at(outputIndex)->get_shape().empty() &&
             _userOutputTensors.at(outputIndex)->get_shape()[utils::BATCH_AXIS] !=
                 _levelZeroOutputTensors.at(outputIndex)->get_shape()[utils::BATCH_AXIS]) {
             if (_userOutputTensors.at(outputIndex)._ptr == nullptr) {
@@ -403,6 +405,29 @@ void ZeroInferRequest::create_pipeline_impl() {
     _logger.debug("create_pipeline_impl - completed");
 }
 
+void ZeroInferRequest::apply_batch_size_candidate(const std::optional<size_t>& batchSizeCandidate,
+                                                   const bool sizeChanged) {
+    if (!batchSizeCandidate.has_value()) {
+        return;
+    }
+    if (_pipelineState != PipelineState::NeedsRecreation) {
+        // Size change indicates the user switched to a different batch dimension.
+        if (sizeChanged) {
+            _pipelineState = PipelineState::NeedsRecreation;
+            _graph->set_batch_size(batchSizeCandidate.value());
+        } else if (_graph->get_batch_size().has_value()) {
+            if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
+                _pipelineState = PipelineState::NeedsRecreation;
+                _graph->set_batch_size(batchSizeCandidate.value());
+            }
+        } else {
+            _graph->set_batch_size(batchSizeCandidate.value());
+        }
+    } else if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
+        OPENVINO_THROW("Batching size is not matching all the tensors.");
+    }
+}
+
 void ZeroInferRequest::set_tensor(const ov::Output<const ov::Node>& port, const ov::SoPtr<ov::ITensor>& tensor) {
     OV_ITT_TASK_CHAIN(ZERO_SET_TENSOR, itt::domains::LevelZeroBackend, "set_tensor", "set_tensor");
 
@@ -428,25 +453,11 @@ void ZeroInferRequest::set_tensor(const ov::Output<const ov::Node>& port, const 
         auto batchSizeCandidate =
             determine_dynamic_batch_size(_metadata.inputs.at(foundPort.idx), ioShape, tensor._ptr, std::nullopt);
 
-        if (batchSizeCandidate.has_value()) {
-            if (!_dynamicBatchValueChanged) {
-                if (get_user_input(foundPort.idx)._ptr != nullptr &&
-                    get_user_input(foundPort.idx)->get_byte_size() * get_user_inputs(foundPort.idx).size() !=
-                        tensor->get_byte_size()) {
-                    _dynamicBatchValueChanged = true;
-                    _graph->set_batch_size(batchSizeCandidate.value());
-                } else if (_graph->get_batch_size().has_value()) {
-                    if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
-                        _dynamicBatchValueChanged = true;
-                        _graph->set_batch_size(batchSizeCandidate.value());
-                    }
-                } else {
-                    _graph->set_batch_size(batchSizeCandidate.value());
-                }
-            } else if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
-                OPENVINO_THROW("Batching size is not matching all the tensors.");
-            }
-        }
+        const bool inputSizeChanged =
+            get_user_input(foundPort.idx)._ptr != nullptr &&
+            get_user_input(foundPort.idx)->get_byte_size() * get_user_inputs(foundPort.idx).size() !=
+                tensor->get_byte_size();
+        apply_batch_size_candidate(batchSizeCandidate, inputSizeChanged);
 
         if (get_level_zero_inputs(foundPort.idx).size() > 1) {
             // Reset vector size to 1 if set_tensor is called after set_tensors
@@ -473,24 +484,10 @@ void ZeroInferRequest::set_tensor(const ov::Output<const ov::Node>& port, const 
         auto batchSizeCandidate =
             determine_dynamic_batch_size(_metadata.outputs.at(foundPort.idx), ioShape, tensor._ptr, std::nullopt);
 
-        if (batchSizeCandidate.has_value()) {
-            if (!_dynamicBatchValueChanged) {
-                if (_userOutputTensors.at(foundPort.idx)._ptr != nullptr &&
-                    _userOutputTensors.at(foundPort.idx)->get_byte_size() != tensor->get_byte_size()) {
-                    _dynamicBatchValueChanged = true;
-                    _graph->set_batch_size(batchSizeCandidate.value());
-                } else if (_graph->get_batch_size().has_value()) {
-                    if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
-                        _dynamicBatchValueChanged = true;
-                        _graph->set_batch_size(batchSizeCandidate.value());
-                    }
-                } else {
-                    _graph->set_batch_size(batchSizeCandidate.value());
-                }
-            } else if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
-                OPENVINO_THROW("Batching size is not matching all the tensors.");
-            }
-        }
+        const bool outputSizeChanged =
+            _userOutputTensors.at(foundPort.idx)._ptr != nullptr &&
+            _userOutputTensors.at(foundPort.idx)->get_byte_size() != tensor->get_byte_size();
+        apply_batch_size_candidate(batchSizeCandidate, outputSizeChanged);
 
         _userOutputTensors.at(foundPort.idx) = tensor;
     }
@@ -528,7 +525,7 @@ void ZeroInferRequest::sync_zero_tensor_with_graph(const ZeroInferRequest::Found
 
             // Check if the current Level Zero tensor was previously shared with the user. If so, it cannot be reused;
             // allocate a new tensor to back up the user tensor (which cannot be imported or used directly).
-            if (_dynamicBatchValueChanged || levelZeroTensor == nullptr || !levelZeroTensor->can_be_reused()) {
+            if (_pipelineState == PipelineState::NeedsRecreation || levelZeroTensor == nullptr || !levelZeroTensor->can_be_reused()) {
                 _logger.debug("sync_zero_tensor_with_graph - allocate locally L0 tensor");
                 OV_ITT_TASK_NEXT(ZERO_SET_TENSOR, "allocate_tensor");
 
@@ -546,7 +543,7 @@ void ZeroInferRequest::sync_zero_tensor_with_graph(const ZeroInferRequest::Found
             }
         }
 
-        if (_pipelineIsCreated && updateCommandListArg && !_dynamicBatchValueChanged) {
+        if (_pipelineState == PipelineState::Ready && updateCommandListArg) {
             _logger.debug("sync_zero_tensor_with_graph - update command list");
 
             OPENVINO_ASSERT(levelZeroTensor->data(), "Empty buffer");
@@ -593,23 +590,9 @@ void ZeroInferRequest::set_tensors(const ov::Output<const ov::Node>& port,
         determine_dynamic_batch_size(_metadata.inputs.at(foundPort.idx), ioShape, nullptr, tensors.size());
 
     // Check if batch has been changed
-    if (batchSizeCandidate.has_value()) {
-        if (!_dynamicBatchValueChanged) {
-            if (get_user_inputs(foundPort.idx).size() != tensors.size()) {
-                _dynamicBatchValueChanged = true;
-                _graph->set_batch_size(batchSizeCandidate.value());
-            } else if (_graph->get_batch_size().has_value()) {
-                if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
-                    _dynamicBatchValueChanged = true;
-                    _graph->set_batch_size(batchSizeCandidate.value());
-                }
-            } else {
-                _graph->set_batch_size(batchSizeCandidate.value());
-            }
-        } else if (batchSizeCandidate.value() != _graph->get_batch_size().value()) {
-            OPENVINO_THROW("Batching size is not matching all the tensors.");
-        }
-    } else {
+    const bool tensorCountChanged = get_user_inputs(foundPort.idx).size() != tensors.size();
+    apply_batch_size_candidate(batchSizeCandidate, tensorCountChanged);
+    if (!batchSizeCandidate.has_value()) {
         batchSizeCandidate = _graph->get_batch_size();
     }
 
@@ -657,7 +640,7 @@ void ZeroInferRequest::sync_zero_tensors_with_graph(const ZeroInferRequest::Foun
                     }
                 }
 
-                if (_pipelineIsCreated && !_dynamicBatchValueChanged) {
+                if (_pipelineState == PipelineState::Ready) {
                     OPENVINO_ASSERT(get_level_zero_input(foundPort.idx, i)->data(), "Empty buffer");
                     OV_ITT_TASK_NEXT(ZERO_SET_TENSORS, "update_graph_arguments");
                     _pipeline->update_graph_arguments(_metadata.inputs.at(foundPort.idx).indexUsedByDriver,
@@ -674,7 +657,7 @@ void ZeroInferRequest::sync_zero_tensors_with_graph(const ZeroInferRequest::Foun
                 OV_ITT_TASK_NEXT(ZERO_SET_TENSORS, "allocate_tensor");
                 levelZeroTensor = allocate_tensor(foundPort.idx, INPUT, tensors.size());
 
-                if (_pipelineIsCreated && !_dynamicBatchValueChanged) {
+                if (_pipelineState == PipelineState::Ready) {
                     OPENVINO_ASSERT(levelZeroTensor->data(), "Empty buffer");
                     OV_ITT_TASK_NEXT(ZERO_SET_TENSORS, "update_graph_arguments");
                     _pipeline->update_graph_arguments(_metadata.inputs.at(foundPort.idx).indexUsedByDriver,
@@ -730,7 +713,7 @@ ov::SoPtr<ov::ITensor> ZeroInferRequest::get_tensor(const ov::Output<const ov::N
     // or the tensor must be reallocated via a callback.
 
     if (userTensor) {
-        if (!_dynamicBatchValueChanged) {
+        if (_pipelineState != PipelineState::NeedsRecreation) {
             _logger.debug("get_tensor - tensor allocated, get tensor by index: %zu", ioIndex);
 
             auto zeroTensor = std::dynamic_pointer_cast<ZeroTensor>(userTensor._ptr);
@@ -740,6 +723,7 @@ ov::SoPtr<ov::ITensor> ZeroInferRequest::get_tensor(const ov::Output<const ov::N
 
             return userTensor;
         } else {
+            // _pipelineState == NeedsRecreation: batch changed, check if the existing tensor still matches.
             if (batchSize.has_value() && userTensor->get_shape()[utils::BATCH_AXIS] == batchSize.value()) {
                 _logger.debug("get_tensor - tensor by index: %zu is already allocated", ioIndex);
 
@@ -762,7 +746,7 @@ ov::SoPtr<ov::ITensor> ZeroInferRequest::get_tensor(const ov::Output<const ov::N
     auto& levelZeroTensor = isInput ? get_level_zero_input(ioIndex) : _levelZeroOutputTensors.at(ioIndex);
     levelZeroTensor = allocate_tensor(ioIndex, isInput, batchSize);
 
-    if (!_dynamicBatchValueChanged) {
+    if (_pipelineState != PipelineState::NeedsRecreation) {
         userTensor = levelZeroTensor;
     }
 
@@ -916,8 +900,10 @@ void ZeroInferRequest::infer_async() {
     OV_ITT_SCOPED_TASK_BASE(itt::domains::InferenceNPU, "Inference::start");
     // This task chain marker will only be available when ENABLE_PROFILING_ITT=FULL
     OV_ITT_TASK_CHAIN(ZERO_INFER, itt::domains::LevelZeroBackend, "infer_async", "start");
+    before_prepare();
     prepare_inputs();
     prepare_outputs();
+    after_prepare();
 
     OV_ITT_TASK_NEXT(ZERO_INFER, "push");
     _pipeline->push();
@@ -928,11 +914,10 @@ void ZeroInferRequest::prepare_inputs() {
     {
         std::lock_guard<std::mutex> lock(_graph->get_mutex());
 
-        if (!_pipelineIsCreated || _dynamicBatchValueChanged) {
+        if (_pipelineState != PipelineState::Ready) {
             OV_ITT_TASK_NEXT(ZERO_INFER, "create_pipeline");
             setup_pipeline();  // Reallocate pipeline if necessary
-            _pipelineIsCreated = true;
-            _dynamicBatchValueChanged = false;  // Reset reallocation flag
+            _pipelineState = PipelineState::Ready;
         } else {
             update_pipeline_if_memory_changed();
             update_states_if_memory_changed();

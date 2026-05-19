@@ -38,7 +38,12 @@ public:
                      const std::vector<ov::SoPtr<ov::ITensor>>& tensors) override;
 
     void infer() override;
-    virtual void infer_async() override;
+    /**
+     * @brief Template Method: owns the canonical inference sequence.
+     *        Subclasses extend behaviour via before_prepare() and after_prepare() hooks,
+     *        not by overriding this method.
+     */
+    void infer_async() final;
     void get_result() override;
 
     const std::vector<ov::Output<const ov::Node>>& get_inputs() const override;
@@ -63,7 +68,7 @@ protected:
             return type == Type::INPUT;
         }
         bool is_output() const {
-            return !is_input();
+            return type == Type::OUTPUT;
         }
     };
 
@@ -76,6 +81,21 @@ protected:
 
     void setup_pipeline();
     virtual void create_pipeline_impl();
+
+    /**
+     * @brief Hook called at the start of infer_async(), before prepare_inputs().
+     *        Override in subclasses to inject logic that must run before tensor preparation
+     *        (e.g. dynamic-shape prediction).  Default implementation is a no-op.
+     */
+    virtual void before_prepare() {}
+
+    /**
+     * @brief Hook called in infer_async() after prepare_outputs() and before pipeline push.
+     *        Override in subclasses to inject logic that must run after tensor preparation
+     *        (e.g. updating Level Zero tensor shapes to match predicted output shapes).
+     *        Default implementation is a no-op.
+     */
+    virtual void after_prepare() {}
 
     /**
      * @brief Allocates a tensor on host and stores the reference inside multiple attributes.
@@ -140,6 +160,30 @@ protected:
     void check_network_precision(const ov::element::Type_t precision) const;
     std::vector<ov::ProfilingInfo> get_profiling_info() const override;
 
+    /**
+     * @brief Applies a batch-size candidate determined from a single tensor or tensor set.
+     *        Advances _pipelineState to NeedsRecreation and calls _graph->set_batch_size when needed.
+     * @param batchSizeCandidate  Result of determine_dynamic_batch_size; no-op if empty.
+     * @param sizeChanged         True when the existing tensor's effective size differs from
+     *                            the incoming one (byte size for single tensors, count for
+     *                            batched tensors), indicating a batch-dimension change.
+     */
+    void apply_batch_size_candidate(const std::optional<size_t>& batchSizeCandidate, bool sizeChanged);
+
+    /**
+     * @brief Lifecycle state of the Level Zero pipeline.
+     *
+     * Transitions:
+     *   Uninitialized  ──(first setup_pipeline)──►  Ready
+     *   Ready          ──(batch size changed)──►    NeedsRecreation
+     *   NeedsRecreation──(setup_pipeline)──►        Ready
+     */
+    enum class PipelineState {
+        Uninitialized,    ///< Pipeline has never been created; must run setup_pipeline() before inference.
+        Ready,            ///< Pipeline is consistent with the current tensors and batch size.
+        NeedsRecreation,  ///< Batch size changed after creation; setup_pipeline() must run before next inference.
+    };
+
     const std::shared_ptr<ZeroInitStructsHolder> _initStructs;
 
     // This is intel_npu::ICompiledModel pointer, but need to use OV base class because
@@ -147,7 +191,8 @@ protected:
     std::shared_ptr<const ov::ICompiledModel> _compiledModel;
 
     const std::shared_ptr<IGraph> _graph;
-    NetworkMetadata _metadata;
+    // Reference into the graph's metadata — valid for the lifetime of _graph (held via shared_ptr above).
+    const NetworkMetadata& _metadata;
     const Config _config;
 
     // In case set_tensors is called, we receive a vector with N tensors otherwise only 1 tensor is needed
@@ -162,8 +207,7 @@ protected:
     mutable std::vector<std::shared_ptr<ZeroTensor>> _levelZeroOutputTensors;
 
     std::unique_ptr<IPipeline> _pipeline;
-    bool _pipelineIsCreated = false;
-    bool _dynamicBatchValueChanged = false;
+    PipelineState _pipelineState = PipelineState::Uninitialized;
 
     Logger _logger;
 

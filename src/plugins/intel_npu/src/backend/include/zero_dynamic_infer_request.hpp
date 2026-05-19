@@ -16,8 +16,6 @@ public:
                                      const std::shared_ptr<const ICompiledModel>& compiledModel,
                                      const Config& config);
 
-    void infer_async() override;
-
 protected:
     void create_pipeline_impl() override;
 
@@ -32,10 +30,25 @@ protected:
                                       const std::vector<ov::SoPtr<ov::ITensor>>& tensors,
                                       const std::optional<size_t>& batchSize = std::nullopt) override;
 
+    /**
+     * @brief Predicts output shapes from the current inputs and validates user-provided output
+     *        tensors against those predictions. Stored in _outputPros for use by after_prepare().
+     */
+    void before_prepare() override;
+
+    /**
+     * @brief Reshapes Level Zero output tensors to the shapes predicted during before_prepare().
+     */
+    void after_prepare() override;
+
+private:
     void predict_shapes(std::vector<IDynamicGraph::MemRefType>& outputProps);
     void check_tensor_and_predicted_shapes(const std::vector<IDynamicGraph::MemRefType>& outputProps);
-
     void update_tensor(const std::vector<IDynamicGraph::MemRefType>& outputProps);
+
+    // Predicted output shapes computed in before_prepare() and consumed in after_prepare().
+    // Lives as a member to avoid a heap allocation on each inference call (capacity is retained).
+    std::vector<IDynamicGraph::MemRefType> _outputPros;
 
     bool _isTensorChanged = false;
 };

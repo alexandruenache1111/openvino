@@ -58,7 +58,7 @@ void ZeroDynamicInferRequest::sync_zero_tensor_with_graph(const ZeroInferRequest
 
             // Check if the current Level Zero tensor was previously shared with the user. If so, it cannot be reused;
             // allocate a new tensor to back up the user tensor (which cannot be imported or used directly).
-            if (_dynamicBatchValueChanged || levelZeroTensor == nullptr || !levelZeroTensor->can_be_reused() ||
+            if (_pipelineState == PipelineState::NeedsRecreation || levelZeroTensor == nullptr || !levelZeroTensor->can_be_reused() ||
                 (levelZeroTensor != nullptr && (levelZeroTensor->get_byte_size() < tensor->get_byte_size()))) {
                 _logger.debug("sync_zero_tensor_with_graph - allocate locally L0 tensor");
                 OV_ITT_TASK_NEXT(ZERO_SET_TENSOR, "allocate tensor");
@@ -71,7 +71,7 @@ void ZeroDynamicInferRequest::sync_zero_tensor_with_graph(const ZeroInferRequest
             }
         }
 
-        if (_pipelineIsCreated && !_dynamicBatchValueChanged) {
+        if (_pipelineState == PipelineState::Ready) {
             _logger.debug("sync_zero_tensor_with_graph - update graph arguments");
 
             OPENVINO_ASSERT(levelZeroTensor->data(), "Empty buffer");
@@ -97,8 +97,8 @@ void ZeroDynamicInferRequest::sync_zero_tensor_with_graph(const ZeroInferRequest
             }
         }
     }
-    if (!_pipelineIsCreated) {
-        // If pipeline is not created, need to predict real output shape
+    if (_pipelineState == PipelineState::Uninitialized) {
+        // If pipeline has not been created yet, shape prediction must run on the next infer_async call.
         _isTensorChanged = true;
     }
     // If command list updates are not supported, fallback to copying tensors every time.
@@ -130,7 +130,7 @@ void ZeroDynamicInferRequest::sync_zero_tensors_with_graph(const ZeroInferReques
                 get_level_zero_input(foundPort.idx, i) = allocate_tensor(foundPort.idx, INPUT, batchSize);
             }
 
-            if (_pipelineIsCreated && !_dynamicBatchValueChanged) {
+            if (_pipelineState == PipelineState::Ready) {
                 OPENVINO_ASSERT(get_level_zero_input(foundPort.idx, i)->data(), "Empty buffer");
                 OV_ITT_TASK_NEXT(ZERO_SET_TENSORS, "update_graph_arguments");
                 if (originalLevelZeroTensor != nullptr &&
@@ -152,8 +152,8 @@ void ZeroDynamicInferRequest::sync_zero_tensors_with_graph(const ZeroInferReques
             }
         }
     }
-    if (!_pipelineIsCreated) {
-        // If pipeline is not created, need to predict real output shape
+    if (_pipelineState == PipelineState::Uninitialized) {
+        // If pipeline has not been created yet, shape prediction must run on the next infer_async call.
         _isTensorChanged = true;
     }
     // If command list updates are not supported, fallback to copying tensors every time.
@@ -198,19 +198,14 @@ std::shared_ptr<ZeroTensor> ZeroDynamicInferRequest::allocate_tensor(
     return tensor;
 }
 
-void ZeroDynamicInferRequest::infer_async() {
-    _logger.debug("infer_async - started");
-    OV_ITT_TASK_CHAIN(ZERO_INFER, itt::domains::LevelZeroBackend, "infer_async", "start");
-    // Store the predicted output shapes
-    std::vector<IDynamicGraph::MemRefType> outputPros;
-    predict_shapes(outputPros);
-    check_tensor_and_predicted_shapes(outputPros);
-    prepare_inputs();
-    prepare_outputs();
-    update_tensor(outputPros);
+void ZeroDynamicInferRequest::before_prepare() {
+    _outputPros.clear();
+    predict_shapes(_outputPros);
+    check_tensor_and_predicted_shapes(_outputPros);
+}
 
-    OV_ITT_TASK_NEXT(ZERO_INFER, "push");
-    _pipeline->push();
+void ZeroDynamicInferRequest::after_prepare() {
+    update_tensor(_outputPros);
 }
 
 void ZeroDynamicInferRequest::predict_shapes(std::vector<IDynamicGraph::MemRefType>& outputProps) {
@@ -336,7 +331,7 @@ void ZeroDynamicInferRequest::check_tensor_and_predicted_shapes(
 
 void ZeroDynamicInferRequest::update_tensor(const std::vector<IDynamicGraph::MemRefType>& outputProps) {
     // Update local level zero buffer shape with predicted shape to prepare for comparasion
-    if (outputProps.size() > 0 && _isTensorChanged) {
+    if (!outputProps.empty() && _isTensorChanged) {
         for (size_t i = 0; i < _levelZeroOutputTensors.size(); i++) {
             auto& levelZeroTensor = _levelZeroOutputTensors.at(i);
             if (levelZeroTensor == nullptr) {
