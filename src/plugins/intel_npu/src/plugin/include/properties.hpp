@@ -75,6 +75,43 @@ public:
     ov::intel_npu::CompilerType determineCompilerType(const ov::AnyMap& properties) const;
     ov::intel_npu::CompilerType determineCompilerTypeForCompatibilityCheck() const;
 
+    /**
+     * @brief Registers (or replaces) a property with a caller-supplied callback, from outside the class.
+     *
+     * Intended for properties whose lambdas must capture state that is only available after the Properties
+     * object is constructed (e.g. IGraph-derived data in CompiledModel).  Unlike the private helpers,
+     * this method uses insert_or_assign so it overwrites any placeholder registered during
+     * registerCompiledModelProperties(), and it keeps _supportedProperties in sync.
+     *
+     * Thread-safe: acquires _mutex internally, so it may be called at any time after construction.
+     *
+     * @tparam PropName  OpenVINO property object type exposing a .name() accessor.
+     * @tparam Func      Callable with signature compatible with ov::Any(const Config&).
+     * @param  propName    The OV property whose .name() identifies the option key.
+     * @param  visibility  True to advertise the property publicly; false for private/internal.
+     * @param  mutability  Desired mutability (RO / RW / WO).
+     * @param  retFunc     Callback invoked on each property read; receives the current Config.
+     */
+    template <typename PropName, typename Func>
+    void registerExternalProperty(const PropName& propName,
+                                  bool visibility,
+                                  ov::PropertyMutability mutability,
+                                  Func&& retFunc) {
+        const std::string name{propName.name()};
+        std::lock_guard<std::mutex> lock(_mutex);
+        _properties.insert_or_assign(name, std::make_tuple(visibility, mutability, std::forward<Func>(retFunc)));
+        // Keep _supportedProperties consistent: remove old entry (if any), re-add if public
+        _supportedProperties.erase(std::remove_if(_supportedProperties.begin(),
+                                                  _supportedProperties.end(),
+                                                  [&name](const ov::PropertyName& pn) {
+                                                      return static_cast<const std::string&>(pn) == name;
+                                                  }),
+                                   _supportedProperties.end());
+        if (visibility) {
+            _supportedProperties.emplace_back(ov::PropertyName(name, mutability));
+        }
+    }
+
 private:
     struct CopyState {
         PropertiesType pType;
@@ -121,6 +158,272 @@ private:
      * @brief Checks whether a property was registered by its name
      */
     bool isPropertyRegistered(const std::string& propertyName) const;
+
+    /**
+     * @brief Registers a config-backed property using a plain config.get<OPT_TYPE>() callback.
+     *
+     * Can be used for any property that has an entry in the OptionsDesc table and requires
+     * no value manipulation beyond a straight config.get<> read.
+     *
+     * @tparam OPT_TYPE  Config option type (e.g. PERF_COUNT) whose value is read by
+     *                   config.get<OPT_TYPE>().
+     * @tparam PropName  OpenVINO property object type exposing a .name() accessor.
+     * @param  propName  The OV property whose .name() identifies the option key.
+     *
+     * @details
+     * - If the option is not present in the global config (filtered out as unsupported),
+     *   registration is skipped silently.
+     * - Visibility (public/private) and mutability (RO/RW) are read from the optionBase
+     *   descriptor associated with the option.
+     * - For COMPILED_MODEL, mutability is unconditionally forced to RO regardless of the
+     *   descriptor value.
+     *
+     * @note For COMPILED_MODEL, prefer tryRegisterCompiledModelPropertyIfSet() when the
+     *       property should only appear if it was explicitly set before compilation.
+     */
+    template <typename OPT_TYPE, typename PropName>
+    void tryRegisterSimpleProperty(const PropName& propName) {
+        const std::string o_name{propName.name()};
+        if (!_config.isAvailable(o_name)) {
+            return;
+        }
+        const bool isPublic = _config.getOpt(o_name).isPublic();
+        const ov::PropertyMutability isMutable = (_pType == PropertiesType::COMPILED_MODEL)
+                                                     ? ov::PropertyMutability::RO
+                                                     : _config.getOpt(o_name).mutability();
+        _properties.emplace(o_name, std::make_tuple(isPublic, isMutable, [](const Config& config) {
+                                return config.get<OPT_TYPE>();
+                            }));
+    }
+
+    /**
+     * @brief Like tryRegisterSimpleProperty but derives the option key from OPT_TYPE::key()
+     *        instead of an OV property object.
+     *
+     * Used for NPUW options whose key is declared as a static constexpr member rather than
+     * through an OV property object — they cannot use tryRegisterSimpleProperty directly.
+     *
+     * @tparam OPT_TYPE  Config option type exposing a static key() accessor.
+     *
+     * @details
+     * - Visibility, mutability, and availability checks follow the same rules as
+     *   tryRegisterSimpleProperty.
+     * - For COMPILED_MODEL, mutability is unconditionally forced to RO.
+     */
+    template <typename OPT_TYPE>
+    void tryRegisterNpuwOptionProperty() {
+        const std::string o_name{OPT_TYPE::key()};
+        if (!_config.isAvailable(o_name)) {
+            return;
+        }
+        const bool isPublic = _config.getOpt(o_name).isPublic();
+        const ov::PropertyMutability isMutable = (_pType == PropertiesType::COMPILED_MODEL)
+                                                     ? ov::PropertyMutability::RO
+                                                     : _config.getOpt(o_name).mutability();
+        _properties.emplace(o_name, std::make_tuple(isPublic, isMutable, [](const Config& config) {
+                                return config.get<OPT_TYPE>();
+                            }));
+    }
+
+    /**
+     * @brief Like tryRegisterSimpleProperty but skips registration when the option has not
+     *        been explicitly set (i.e. is still at its default value).
+     *
+     * Intended exclusively for COMPILED_MODEL properties to avoid reporting settings that
+     * were never passed to the compiler.  Advertising a default value can be misleading —
+     * the default may not have been honoured by the compiler at all, or may be out of sync
+     * with the compiler's own internal default.
+     *
+     * For COMPILED_MODEL, visibility is also unconditionally forced to PUBLIC (in addition
+     * to the standard RO-mutability override that all compiled-model registrations apply).
+     *
+     * @tparam OPT_TYPE  Config option type whose value is retrieved by config.get<OPT_TYPE>().
+     * @tparam PropName  OpenVINO property object type exposing a .name() accessor.
+     * @param  propName  The OV property whose .name() identifies the option key.
+     *
+     * @details
+     * - First checks whether the option has a previously-set value (_config.has()). If not,
+     *   registration is skipped entirely — the property will not appear in supported_properties.
+     * - Then checks availability in the global config. If unavailable, registration is skipped.
+     * - For COMPILED_MODEL: mutability → RO, visibility → PUBLIC (always).
+     *
+     * @note **TO BE USED FOR COMPILED_MODEL ONLY** — unconditionally forces the property public.
+     */
+    template <typename OPT_TYPE, typename PropName>
+    void tryRegisterCompiledModelPropertyIfSet(const PropName& propName) {
+        const std::string o_name{propName.name()};
+        if (!_config.has(o_name)) {
+            return;
+        }
+        if (!_config.isAvailable(o_name)) {
+            return;
+        }
+        bool isPublic = _config.getOpt(o_name).isPublic();
+        ov::PropertyMutability isMutable = _config.getOpt(o_name).mutability();
+        if (_pType == PropertiesType::COMPILED_MODEL) {
+            isMutable = ov::PropertyMutability::RO;
+            isPublic = true;
+        }
+        _properties.emplace(o_name, std::make_tuple(isPublic, isMutable, [](const Config& config) {
+                                return config.get<OPT_TYPE>();
+                            }));
+    }
+
+    /**
+     * @brief Like tryRegisterSimpleProperty but overrides visibility with the caller-supplied value.
+     *
+     * Provides the same functionality as tryRegisterSimpleProperty with the additional ability
+     * to enforce a specific public/private visibility at registration time, rather than reading
+     * it from the option descriptor.  Useful when the runtime context (e.g. a hardware capability
+     * check) determines whether the property should be publicly advertised.
+     *
+     * Mutability is still read from the option descriptor.
+     * For COMPILED_MODEL, mutability is unconditionally forced to RO.
+     *
+     * @tparam OPT_TYPE   Config option type whose value is retrieved by config.get<OPT_TYPE>().
+     * @tparam PropName   OpenVINO property object type exposing a .name() accessor.
+     * @param  propName   The OV property whose .name() identifies the option key.
+     * @param  visibility True to advertise the property publicly; false for private.
+     *
+     * @see tryRegisterSimpleProperty
+     */
+    template <typename OPT_TYPE, typename PropName>
+    void tryRegisterVarpubProperty(const PropName& propName, bool visibility) {
+        const std::string o_name{propName.name()};
+        if (!_config.isAvailable(o_name)) {
+            return;
+        }
+        const ov::PropertyMutability isMutable = (_pType == PropertiesType::COMPILED_MODEL)
+                                                     ? ov::PropertyMutability::RO
+                                                     : _config.getOpt(o_name).mutability();
+        _properties.emplace(o_name, std::make_tuple(visibility, isMutable, [](const Config& config) {
+                                return config.get<OPT_TYPE>();
+                            }));
+    }
+
+    /**
+     * @brief Like tryRegisterSimpleProperty but accepts a caller-supplied callback instead of
+     *        the auto-generated config.get<> one.
+     *
+     * Use when the property's value requires additional logic beyond a direct config read —
+     * for example, a fallback to a metrics query when the config entry has not been set.
+     *
+     * Visibility and mutability are still read from the option descriptor.
+     * For COMPILED_MODEL, mutability is unconditionally forced to RO.
+     *
+     * @tparam PropName  OpenVINO property object type exposing a .name() accessor.
+     * @tparam Func      Callable with signature compatible with ov::Any(const Config&).
+     * @param  propName  The OV property whose .name() identifies the option key.
+     * @param  retFunc   Callback invoked on each property read; receives the current Config.
+     *
+     * @details
+     * - If the option is not present in the global config, registration is skipped.
+     * - Visibility and mutability are derived from the optionBase descriptor, with COMPILED_MODEL
+     *   mutability forced to RO.
+     *
+     * @see tryRegisterSimpleProperty
+     */
+    template <typename PropName, typename Func>
+    void tryRegisterCustomFuncProperty(const PropName& propName, Func&& retFunc) {
+        const std::string o_name{propName.name()};
+        if (!_config.isAvailable(o_name)) {
+            return;
+        }
+        const bool isPublic = _config.getOpt(o_name).isPublic();
+        const ov::PropertyMutability isMutable = (_pType == PropertiesType::COMPILED_MODEL)
+                                                     ? ov::PropertyMutability::RO
+                                                     : _config.getOpt(o_name).mutability();
+        _properties.emplace(o_name, std::make_tuple(isPublic, isMutable, std::forward<Func>(retFunc)));
+    }
+
+    /**
+     * @brief Registers a fully custom property with all attributes supplied by the caller.
+     *
+     * Unlike the other registration helpers, this function takes explicit visibility,
+     * mutability, and callback — nothing is derived from the option descriptor.
+     * It only performs an availability check against the global config; no
+     * COMPILED_MODEL-specific overrides (force-RO, force-public, check-if-set) are applied.
+     *
+     * @tparam PropName    OpenVINO property object type exposing a .name() accessor.
+     * @tparam Func        Callable with signature compatible with ov::Any(const Config&).
+     * @param  propName    The OV property whose .name() identifies the option key.
+     * @param  visibility  True to advertise the property publicly; false for private.
+     * @param  mutability  Desired mutability (RO / RW / WO).
+     * @param  retFunc     Callback invoked on each property read; receives the current Config.
+     *
+     * @details
+     * - If the option is not present in the global config, registration is skipped.
+     *
+     * @note Does not enforce RO or PUBLIC for COMPILED_MODEL — use only when the standard
+     *       compiled-model overrides are explicitly undesirable.
+     */
+    template <typename PropName, typename Func>
+    void tryRegisterCustomProperty(const PropName& propName,
+                                   bool visibility,
+                                   ov::PropertyMutability mutability,
+                                   Func&& retFunc) {
+        const std::string o_name{propName.name()};
+        if (!_config.isAvailable(o_name)) {
+            return;
+        }
+        _properties.emplace(o_name, std::make_tuple(visibility, mutability, std::forward<Func>(retFunc)));
+    }
+
+    /**
+     * @brief Unconditionally registers a fully custom property — no availability check is
+     *        performed.
+     *
+     * Same as tryRegisterCustomProperty but skips the _config.isAvailable() guard entirely.
+     * Use only when the property must always be advertised regardless of whether the underlying
+     * option was registered in the global config (e.g. ov::hint::model, which is a framework
+     * contract rather than a config-backed option).
+     *
+     * @tparam PropName    OpenVINO property object type exposing a .name() accessor.
+     * @tparam Func        Callable with signature compatible with ov::Any(const Config&).
+     * @param  propName    The OV property whose .name() identifies the option key.
+     * @param  visibility  True to advertise the property publicly; false for private.
+     * @param  mutability  Desired mutability (RO / RW / WO).
+     * @param  retFunc     Callback invoked on each property read; receives the current Config.
+     *
+     * @note No availability, COMPILED_MODEL, or any other checks are performed.
+     */
+    template <typename PropName, typename Func>
+    void forceRegisterCustomProperty(const PropName& propName,
+                                     bool visibility,
+                                     ov::PropertyMutability mutability,
+                                     Func&& retFunc) {
+        _properties.emplace(propName.name(), std::make_tuple(visibility, mutability, std::forward<Func>(retFunc)));
+    }
+
+    /**
+     * @brief Registers a read-only metric property backed by a caller-supplied callable.
+     *
+     * Metrics differ from config-backed properties: they have no entry in the config map
+     * and no OptionBase descriptor.  They represent static, read-only characteristics of
+     * the device, plugin, or environment (e.g. device name, driver version, available devices).
+     *
+     * This function supersedes both the former REGISTER_SIMPLE_METRIC (which took a plain
+     * value expression evaluated lazily by a capturing lambda) and REGISTER_CUSTOM_METRIC
+     * (which took a full lambda).  Both patterns are now expressed as a callable argument:
+     * pass a lambda that returns a pre-computed value for the "simple" case, or one that
+     * queries a live source (metrics object, backend, etc.) for the "custom" case.
+     *
+     * No config availability check is performed — metrics are unconditionally registered.
+     * Mutability is always RO.
+     *
+     * @tparam PropName  OpenVINO property object type exposing a .name() accessor.
+     * @tparam Func      Callable with signature compatible with ov::Any(const Config&).
+     * @param  propName  The OV property whose .name() identifies the metric.
+     * @param  visibility True to advertise the metric publicly; false for private/internal.
+     * @param  retFunc   Callback invoked on each property read; receives the current Config.
+     *
+     * @note No compiled-model-specific checks are applied.
+     */
+    template <typename PropName, typename Func>
+    void registerMetric(const PropName& propName, bool visibility, Func&& retFunc) {
+        _properties.emplace(propName.name(),
+                            std::make_tuple(visibility, ov::PropertyMutability::RO, std::forward<Func>(retFunc)));
+    }
 
     // internal registration functions based on client object
     /**

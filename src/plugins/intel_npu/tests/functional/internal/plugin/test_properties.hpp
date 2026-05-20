@@ -40,6 +40,24 @@ using ::testing::HasSubstr;
 using ConfigParams = std::tuple<std::string,   // Device name
                                 std::string>;  // Config name
 
+namespace {
+/**
+ * @brief Registers one config option in both an OptionsDesc and a FilteredConfig.
+ *
+ * Shared by all test fixtures that need to populate a synthetic config table.
+ * Adds @p OPT_TYPE to the options descriptor and marks the key as disabled;
+ * the caller is responsible for enabling it via cfg.enable() or
+ * cfg.enableRuntimeOptions().
+ */
+template <typename OPT_TYPE>
+void registerOptionHelper(::intel_npu::OptionsDesc& opts, ::intel_npu::FilteredConfig& cfg) {
+    const auto dummyopt = ::intel_npu::details::makeOptionModel<OPT_TYPE>();
+    const std::string o_name{dummyopt.key().data()};
+    opts.add<OPT_TYPE>();
+    cfg.enable(o_name, false);
+}
+}  // namespace
+
 namespace ov {
 namespace test {
 namespace behavior {
@@ -53,6 +71,11 @@ protected:
 
     std::string configuration;
     std::string targetDevice;
+
+    template <typename OPT_TYPE>
+    void registerOption() {
+        registerOptionHelper<OPT_TYPE>(*options, npu_config);
+    }
 
 public:
     static std::string getTestCaseName(const testing::TestParamInfo<ConfigParams>& obj) {
@@ -83,74 +106,66 @@ public:
 
         options->reset();
 
-#define REGISTER_OPTION(OPT_TYPE)                             \
-    do {                                                      \
-        auto dummyopt = details::makeOptionModel<OPT_TYPE>(); \
-        std::string o_name = dummyopt.key().data();           \
-        options->add<OPT_TYPE>();                             \
-        npu_config.enable(std::move(o_name), false);          \
-    } while (0)
-
-        REGISTER_OPTION(LOG_LEVEL);
-        REGISTER_OPTION(CACHE_DIR);
-        REGISTER_OPTION(CACHE_MODE);
-        REGISTER_OPTION(COMPILED_BLOB);
-        REGISTER_OPTION(DEVICE_ID);
-        REGISTER_OPTION(NUM_STREAMS);
-        REGISTER_OPTION(PERF_COUNT);
-        REGISTER_OPTION(LOADED_FROM_CACHE);
-        REGISTER_OPTION(COMPILATION_NUM_THREADS);
-        REGISTER_OPTION(PERFORMANCE_HINT);
-        REGISTER_OPTION(EXECUTION_MODE_HINT);
-        REGISTER_OPTION(PERFORMANCE_HINT_NUM_REQUESTS);
-        REGISTER_OPTION(ENABLE_CPU_PINNING);
-        REGISTER_OPTION(INFERENCE_PRECISION_HINT);
-        REGISTER_OPTION(MODEL_PRIORITY);
-        REGISTER_OPTION(EXCLUSIVE_ASYNC_REQUESTS);
-        REGISTER_OPTION(COMPILATION_MODE_PARAMS);
-        REGISTER_OPTION(DMA_ENGINES);
-        REGISTER_OPTION(TILES);
-        REGISTER_OPTION(COMPILATION_MODE);
-        REGISTER_OPTION(COMPILER_TYPE);
-        REGISTER_OPTION(PLATFORM);
-        REGISTER_OPTION(CREATE_EXECUTOR);
-        REGISTER_OPTION(DYNAMIC_SHAPE_TO_STATIC);
-        REGISTER_OPTION(PROFILING_TYPE);
-        REGISTER_OPTION(BACKEND_COMPILATION_PARAMS);
-        REGISTER_OPTION(BATCH_MODE);
-        REGISTER_OPTION(BYPASS_UMD_CACHING);
-        REGISTER_OPTION(DEFER_WEIGHTS_LOAD);
-        REGISTER_OPTION(WEIGHTS_PATH);
-        REGISTER_OPTION(RUN_INFERENCES_SEQUENTIALLY);
-        REGISTER_OPTION(COMPILER_DYNAMIC_QUANTIZATION);
-        REGISTER_OPTION(QDQ_OPTIMIZATION);
-        REGISTER_OPTION(QDQ_OPTIMIZATION_AGGRESSIVE);
-        REGISTER_OPTION(STEPPING);
-        REGISTER_OPTION(DISABLE_VERSION_CHECK);
-        REGISTER_OPTION(EXPORT_RAW_BLOB);
-        REGISTER_OPTION(IMPORT_RAW_BLOB);
-        REGISTER_OPTION(BATCH_COMPILER_MODE_SETTINGS);
-        REGISTER_OPTION(TURBO);
-        REGISTER_OPTION(SEPARATE_WEIGHTS_VERSION);
-        REGISTER_OPTION(WS_COMPILE_CALL_NUMBER);
-        REGISTER_OPTION(MODEL_SERIALIZER_VERSION);
-        REGISTER_OPTION(ENABLE_STRIDES_FOR);
-        REGISTER_OPTION(SHARED_COMMON_QUEUE);
+        registerOption<LOG_LEVEL>();
+        registerOption<CACHE_DIR>();
+        registerOption<CACHE_MODE>();
+        registerOption<COMPILED_BLOB>();
+        registerOption<DEVICE_ID>();
+        registerOption<NUM_STREAMS>();
+        registerOption<PERF_COUNT>();
+        registerOption<LOADED_FROM_CACHE>();
+        registerOption<COMPILATION_NUM_THREADS>();
+        registerOption<PERFORMANCE_HINT>();
+        registerOption<EXECUTION_MODE_HINT>();
+        registerOption<PERFORMANCE_HINT_NUM_REQUESTS>();
+        registerOption<ENABLE_CPU_PINNING>();
+        registerOption<INFERENCE_PRECISION_HINT>();
+        registerOption<MODEL_PRIORITY>();
+        registerOption<EXCLUSIVE_ASYNC_REQUESTS>();
+        registerOption<COMPILATION_MODE_PARAMS>();
+        registerOption<DMA_ENGINES>();
+        registerOption<TILES>();
+        registerOption<COMPILATION_MODE>();
+        registerOption<COMPILER_TYPE>();
+        registerOption<PLATFORM>();
+        registerOption<CREATE_EXECUTOR>();
+        registerOption<DYNAMIC_SHAPE_TO_STATIC>();
+        registerOption<PROFILING_TYPE>();
+        registerOption<BACKEND_COMPILATION_PARAMS>();
+        registerOption<BATCH_MODE>();
+        registerOption<BYPASS_UMD_CACHING>();
+        registerOption<DEFER_WEIGHTS_LOAD>();
+        registerOption<WEIGHTS_PATH>();
+        registerOption<RUN_INFERENCES_SEQUENTIALLY>();
+        registerOption<COMPILER_DYNAMIC_QUANTIZATION>();
+        registerOption<QDQ_OPTIMIZATION>();
+        registerOption<QDQ_OPTIMIZATION_AGGRESSIVE>();
+        registerOption<STEPPING>();
+        registerOption<DISABLE_VERSION_CHECK>();
+        registerOption<EXPORT_RAW_BLOB>();
+        registerOption<IMPORT_RAW_BLOB>();
+        registerOption<BATCH_COMPILER_MODE_SETTINGS>();
+        registerOption<TURBO>();
+        registerOption<SEPARATE_WEIGHTS_VERSION>();
+        registerOption<WS_COMPILE_CALL_NUMBER>();
+        registerOption<MODEL_SERIALIZER_VERSION>();
+        registerOption<ENABLE_STRIDES_FOR>();
+        registerOption<SHARED_COMMON_QUEUE>();
 
         if (backend) {
-            REGISTER_OPTION(MAX_TILES);
+            registerOption<MAX_TILES>();
 
             if (backend->isCommandQueueExtSupported()) {
-                REGISTER_OPTION(WORKLOAD_TYPE);
+                registerOption<WORKLOAD_TYPE>();
             }
             if (backend->isContextExtSupported()) {
-                REGISTER_OPTION(DISABLE_IDLE_MEMORY_PRUNING);
+                registerOption<DISABLE_IDLE_MEMORY_PRUNING>();
             }
         }
 
-        for_each_exposed_npuw_option([&](auto tag) {
+        for_each_exposed_npuw_option([this](auto tag) {
             using Opt = typename decltype(tag)::type;
-            REGISTER_OPTION(Opt);
+            registerOption<Opt>();
         });
 
         npu_config.enableRuntimeOptions();
@@ -270,6 +285,189 @@ TEST_P(ExpectLoadingCompilerPropertySupported, ExpectCompilerPropertyIsSupported
     ASSERT_TRUE(isSupported);
     ASSERT_NE(logs.find("initialize DriverCompilerAdapter start"), std::string::npos);
     ASSERT_EQ(logs.find("initialize PluginCompilerAdapter start"), std::string::npos);
+}
+
+// ============================================================================
+// CompiledModelPropertiesTests
+// Tests for Properties::registerExternalProperty and the compiled-model changes:
+//  - ov::model_name  is NOT registered by default; registered via registerExternalProperty()
+//  - ov::runtime_requirements is NOT registered by default; registered conditionally
+// ============================================================================
+
+/**
+ * @brief Minimal fixture for Properties(COMPILED_MODEL) that requires no real backend.
+ *
+ * Only LOG_LEVEL is registered so the internal logger can be constructed.
+ * All other compiled-model options are absent; the tryRegister* helpers gracefully skip them.
+ * metrics and backend are passed as nullptr since registerCompiledModelProperties() does not use them.
+ */
+class CompiledModelPropertiesTests : public ::testing::Test {
+protected:
+    std::shared_ptr<::intel_npu::OptionsDesc> options = std::make_shared<::intel_npu::OptionsDesc>();
+    ::intel_npu::FilteredConfig config{options};
+    std::unique_ptr<::intel_npu::Properties> propertiesManager;
+
+    template <typename OPT_TYPE>
+    void registerOption() {
+        registerOptionHelper<OPT_TYPE>(*options, config);
+    }
+
+    void SetUp() override {
+        registerOption<::intel_npu::LOG_LEVEL>();
+        config.enableRuntimeOptions();
+        config.enable(ov::log::level.name(), true);
+        // metrics and backend default to null — safe for COMPILED_MODEL since
+        // registerCompiledModelProperties() does not use them.
+        propertiesManager =
+            std::make_unique<::intel_npu::Properties>(::intel_npu::PropertiesType::COMPILED_MODEL, config);
+    }
+
+    bool isSupportedProperty(const std::string& name) {
+        const auto supported =
+            propertiesManager->getProperty(ov::supported_properties.name()).as<std::vector<ov::PropertyName>>();
+        return std::any_of(supported.begin(), supported.end(), [&name](const ov::PropertyName& pn) {
+            return static_cast<std::string>(pn) == name;
+        });
+    }
+};
+
+// ---- ov::model_name ---------------------------------------------------------
+// ov::model_name was removed from registerCompiledModelProperties().
+// CompiledModel::CompiledModel() calls registerExternalProperty() to provide the real graph name.
+
+TEST_F(CompiledModelPropertiesTests, ModelNameNotRegisteredByDefault_GetPropertyThrows) {
+    ASSERT_THROW(propertiesManager->getProperty(ov::model_name.name()), ov::Exception);
+}
+
+TEST_F(CompiledModelPropertiesTests, ModelNameNotRegisteredByDefault_NotInSupportedProperties) {
+    ASSERT_FALSE(isSupportedProperty(ov::model_name.name()));
+}
+
+TEST_F(CompiledModelPropertiesTests, RegisterExternalModelName_GetPropertyReturnsValue) {
+    const std::string expectedName = "my_test_model";
+    propertiesManager->registerExternalProperty(ov::model_name,
+                                                true,
+                                                ov::PropertyMutability::RO,
+                                                [expectedName](const ::intel_npu::Config&) -> ov::Any {
+                                                    return expectedName;
+                                                });
+
+    ASSERT_EQ(propertiesManager->getProperty(ov::model_name.name()).as<std::string>(), expectedName);
+}
+
+TEST_F(CompiledModelPropertiesTests, RegisterExternalModelName_AppearsInSupportedProperties) {
+    propertiesManager->registerExternalProperty(ov::model_name,
+                                                true,
+                                                ov::PropertyMutability::RO,
+                                                [](const ::intel_npu::Config&) -> ov::Any {
+                                                    return std::string("some_model");
+                                                });
+
+    ASSERT_TRUE(isSupportedProperty(ov::model_name.name()));
+}
+
+// ---- ov::runtime_requirements -----------------------------------------------
+// ov::runtime_requirements was removed from registerCompiledModelProperties().
+// CompiledModel::CompiledModel() only registers it when graph->get_compatibility_descriptor() has a value.
+
+TEST_F(CompiledModelPropertiesTests, RuntimeRequirementsNotRegisteredByDefault_GetPropertyThrows) {
+    ASSERT_THROW(propertiesManager->getProperty(ov::runtime_requirements.name()), ov::Exception);
+}
+
+TEST_F(CompiledModelPropertiesTests, RuntimeRequirementsNotRegisteredByDefault_NotInSupportedProperties) {
+    ASSERT_FALSE(isSupportedProperty(ov::runtime_requirements.name()));
+}
+
+TEST_F(CompiledModelPropertiesTests, RegisterExternalRuntimeRequirements_GetPropertyReturnsValue) {
+    const std::string expectedReqs = "platform=NPU3720;ov_version=2025.4.0";
+    propertiesManager->registerExternalProperty(ov::runtime_requirements,
+                                                true,
+                                                ov::PropertyMutability::RO,
+                                                [expectedReqs](const ::intel_npu::Config&) -> ov::Any {
+                                                    return expectedReqs;
+                                                });
+
+    ASSERT_EQ(propertiesManager->getProperty(ov::runtime_requirements.name()).as<std::string>(), expectedReqs);
+}
+
+TEST_F(CompiledModelPropertiesTests, RegisterExternalRuntimeRequirements_AppearsInSupportedProperties) {
+    propertiesManager->registerExternalProperty(ov::runtime_requirements,
+                                                true,
+                                                ov::PropertyMutability::RO,
+                                                [](const ::intel_npu::Config&) -> ov::Any {
+                                                    return std::string("");
+                                                });
+
+    ASSERT_TRUE(isSupportedProperty(ov::runtime_requirements.name()));
+}
+
+// ---- Conditional registration mirrors CompiledModel constructor logic --------
+
+// When the compatibility descriptor is absent, runtime_requirements is NOT registered —
+// mirrors the `if (_graph->get_compatibility_descriptor().has_value())` guard in the constructor.
+TEST_F(CompiledModelPropertiesTests, RuntimeRequirements_NotRegisteredWhenCompatDescAbsent) {
+    const std::optional<std::string> compatDesc = std::nullopt;
+    if (compatDesc.has_value()) {
+        propertiesManager->registerExternalProperty(ov::runtime_requirements,
+                                                    true,
+                                                    ov::PropertyMutability::RO,
+                                                    [&compatDesc](const ::intel_npu::Config&) -> ov::Any {
+                                                        return *compatDesc;
+                                                    });
+    }
+
+    ASSERT_FALSE(isSupportedProperty(ov::runtime_requirements.name()));
+    ASSERT_THROW(propertiesManager->getProperty(ov::runtime_requirements.name()), ov::Exception);
+}
+
+// When the compatibility descriptor is present, runtime_requirements IS registered.
+TEST_F(CompiledModelPropertiesTests, RuntimeRequirements_RegisteredWhenCompatDescPresent) {
+    const std::optional<std::string> compatDesc = std::string("platform=NPU3720;ov_version=2025.4.0");
+    if (compatDesc.has_value()) {
+        propertiesManager->registerExternalProperty(ov::runtime_requirements,
+                                                    true,
+                                                    ov::PropertyMutability::RO,
+                                                    [compatDesc](const ::intel_npu::Config&) -> ov::Any {
+                                                        return compatDesc.value();
+                                                    });
+    }
+
+    ASSERT_TRUE(isSupportedProperty(ov::runtime_requirements.name()));
+    ASSERT_EQ(propertiesManager->getProperty(ov::runtime_requirements.name()).as<std::string>(), compatDesc.value());
+}
+
+// ---- registerExternalProperty: general behaviour ----------------------------
+
+// Calling registerExternalProperty twice must overwrite the first registration (insert_or_assign semantics).
+TEST_F(CompiledModelPropertiesTests, RegisterExternalProperty_OverwritesPreviousRegistration) {
+    propertiesManager->registerExternalProperty(ov::model_name,
+                                                true,
+                                                ov::PropertyMutability::RO,
+                                                [](const ::intel_npu::Config&) -> ov::Any {
+                                                    return std::string("first");
+                                                });
+    ASSERT_EQ(propertiesManager->getProperty(ov::model_name.name()).as<std::string>(), "first");
+
+    propertiesManager->registerExternalProperty(ov::model_name,
+                                                true,
+                                                ov::PropertyMutability::RO,
+                                                [](const ::intel_npu::Config&) -> ov::Any {
+                                                    return std::string("second");
+                                                });
+    ASSERT_EQ(propertiesManager->getProperty(ov::model_name.name()).as<std::string>(), "second");
+}
+
+// A private (visibility=false) property is still readable but must NOT appear in supported_properties.
+TEST_F(CompiledModelPropertiesTests, RegisterExternalProperty_PrivateIsReadableButNotInSupportedProperties) {
+    propertiesManager->registerExternalProperty(ov::model_name,
+                                                false,
+                                                ov::PropertyMutability::RO,
+                                                [](const ::intel_npu::Config&) -> ov::Any {
+                                                    return std::string("private_value");
+                                                });
+
+    ASSERT_EQ(propertiesManager->getProperty(ov::model_name.name()).as<std::string>(), "private_value");
+    ASSERT_FALSE(isSupportedProperty(ov::model_name.name()));
 }
 
 using ExpectLoadingCompilerPropertyNotSupported = PropertiesManagerTests;
