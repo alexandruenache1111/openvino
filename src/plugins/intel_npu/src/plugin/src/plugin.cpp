@@ -212,6 +212,16 @@ std::shared_ptr<const ov::Model> get_model_ptr_from_map(ov::AnyMap& properties) 
     return nullptr;
 }
 
+// Reads a per-call ov::log::level from the call properties, if present. Used to scope the plugin log level to a
+// single compile/import/query call via Logger::GlobalLevelGuard.
+std::optional<ov::log::Level> read_log_level(const ov::AnyMap& properties) {
+    const auto it = properties.find(ov::log::level.name());
+    if (it == properties.end()) {
+        return std::nullopt;
+    }
+    return it->second.as<ov::log::Level>();
+}
+
 void init_config(const IEngineBackend* backend, OptionsDesc& options, FilteredConfig& config) {
     // Initialize (note: it will reset registered options)
     options.reset();
@@ -331,7 +341,7 @@ void init_config(const IEngineBackend* backend, OptionsDesc& options, FilteredCo
 
 namespace intel_npu {
 
-Plugin::Plugin() : _logger("NPUPlugin", Logger::global().level()) {
+Plugin::Plugin() : _logger(Logger::followingGlobal("NPUPlugin")) {
     OV_ITT_SCOPED_TASK(itt::domains::NPUPlugin, "Plugin::Plugin");
     set_device_name("NPU");
 
@@ -341,8 +351,8 @@ Plugin::Plugin() : _logger("NPUPlugin", Logger::global().level()) {
 
     FilteredConfig config(options);
     config.parseEnvVars();
+    // _logger follows the global store, so setting the global baseline is enough - it needs no separate update.
     Logger::global().setLevel(config.get<LOG_LEVEL>());
-    _logger.setLevel(config.get<LOG_LEVEL>());
 
     OV_ITT_TASK_CHAIN(PLUGIN, itt::domains::NPUPlugin, "Plugin::Plugin", "GetBackend");
     // backend registry shall be created after configs are updated
@@ -389,7 +399,9 @@ bool Plugin::is_property_supported(const std::string& name, const ov::AnyMap& ar
 std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<const ov::Model>& model,
                                                           const ov::AnyMap& properties) const {
     OV_ITT_SCOPED_TASK(itt::domains::NPUPlugin, "Plugin::compile_model");
-    update_log_level(properties);
+    // Per-call LOG_LEVEL is scoped to this call (thread-local) and restored on return; it does not leak into the
+    // persistent baseline or affect other threads.
+    const auto logLevelScope = scoped_log_level(properties);
 
     // Before going any further: if
     // ... 1 - NPUW mode is activated
@@ -631,7 +643,7 @@ ov::SoPtr<ov::IRemoteContext> Plugin::get_default_context(const ov::AnyMap&) con
 
 std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream, const ov::AnyMap& properties) const {
     OV_ITT_SCOPED_TASK(itt::domains::NPUPlugin, "Plugin::import_model");
-    update_log_level(properties);
+    const auto logLevelScope = scoped_log_level(properties);
 
     if (properties.find(ov::hint::compiled_blob.name()) != properties.end()) {
         _logger.warning("ov::hint::compiled_blob is no longer supported for import_model(stream) API! Please use new "
@@ -698,7 +710,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& stream,
 std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& compiledBlob,
                                                          const ov::AnyMap& properties) const {
     OV_ITT_SCOPED_TASK(itt::domains::NPUPlugin, "Plugin::import_model");
-    update_log_level(properties);
+    const auto logLevelScope = scoped_log_level(properties);
 
     // Need to create intermediate istream for NPUW
     ov::SharedStreamBuffer buffer{compiledBlob.data(), compiledBlob.get_byte_size()};
@@ -758,7 +770,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& compi
 ov::SupportedOpsMap Plugin::query_model(const std::shared_ptr<const ov::Model>& model,
                                         const ov::AnyMap& properties) const {
     OV_ITT_SCOPED_TASK(itt::domains::NPUPlugin, "Plugin::query_model");
-    update_log_level(properties);
+    const auto logLevelScope = scoped_log_level(properties);
 
     auto localProperties = properties;
 
@@ -976,10 +988,20 @@ std::shared_ptr<ov::ICompiledModel> Plugin::parse(const ov::Tensor& tensorBig,
 }
 
 void Plugin::update_log_level(const ov::AnyMap& properties) const {
-    if (properties.count(ov::log::level.name()) != 0) {
-        Logger::global().setLevel(properties.at(ov::log::level.name()).as<ov::log::Level>());
-        _logger.setLevel(properties.at(ov::log::level.name()).as<ov::log::Level>());
+    // Permanent update path (set_property): a LOG_LEVEL set here changes the persistent global baseline for the whole
+    // process. This is a thread-safe atomic store; _logger and every other global-following logger observe it
+    // automatically, so no per-instance mutation is needed.
+    if (const auto level = read_log_level(properties)) {
+        Logger::global().setLevel(*level);
     }
+}
+
+std::optional<Logger::GlobalLevelGuard> Plugin::scoped_log_level(const ov::AnyMap& properties) const {
+    const auto level = read_log_level(properties);
+    if (!level) {
+        return std::nullopt;
+    }
+    return std::optional<Logger::GlobalLevelGuard>(std::in_place, *level);
 }
 
 std::atomic<int> Plugin::_compiledModelLoadCounter{1};

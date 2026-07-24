@@ -4,12 +4,14 @@
 
 #include "intel_npu/utils/logger/logger.hpp"
 
-#include <cassert>
+#include <atomic>
 #include <chrono>
 #include <cstdarg>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <mutex>
-#include <regex>
+#include <optional>
 #include <sstream>
 
 #include "openvino/core/log_util.hpp"
@@ -37,8 +39,12 @@ std::string printFormattedCStr(const char* fmt, ...) {
     if (requiredBytes < 0) {
         va_end(argsForFinalBuffer);
         return std::string("vsnprintf got error from fmt: ") + fmt;
-    } else if (requiredBytes > bufferSize) {
-        std::string out(requiredBytes, 0);  // +1 implicitly
+    } else if (requiredBytes >= bufferSize) {
+        // vsnprintf returns the length excluding the NUL; buffer holds bufferSize bytes = (bufferSize - 1) chars +
+        // NUL. So requiredBytes == bufferSize already means the first call truncated - reformat into a big-enough
+        // buffer. std::string(requiredBytes, 0) gives requiredBytes writable chars plus the implicit NUL slot, i.e.
+        // requiredBytes + 1 bytes, which is exactly what vsnprintf needs.
+        std::string out(requiredBytes, 0);
         vsnprintf(out.data(), requiredBytes + 1, fmt, argsForFinalBuffer);
         va_end(argsForFinalBuffer);
         return out;
@@ -53,22 +59,100 @@ std::string printFormattedCStr(const char* fmt, ...) {
 //
 static const char* logLevelPrintout[] = {"NONE", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE"};
 
-Logger& Logger::global() {
-#if defined(NPU_PLUGIN_DEVELOPER_BUILD) || !defined(NDEBUG)
-    ov::log::Level logLvl = ov::log::Level::WARNING;
-    if (const auto env = std::getenv("OV_NPU_LOG_LEVEL")) {
-        try {
-            std::istringstream is(env);
-            is >> logLvl;
-        } catch (...) {
-            // Use deault log level
+// Thread-safe backing store for the process-wide log level.
+//
+// The effective level is the composition of two things:
+//   - a persistent baseline (atomic), set once from env/build and optionally updated by set_property; shared by all
+//     threads. Reads/writes are atomic, so there is no data race even under concurrent access.
+//   - a per-thread override (thread_local optional), installed for the duration of a single plugin call by
+//     GlobalLevelGuard. Being thread-local, one thread's per-call level can never be observed - or clobbered - by
+//     another thread. This is what makes per-call LOG_LEVEL both correct (scoped to the call) and race-free.
+//
+// A Logger created via Logger::global() or Logger::followingGlobal() reads through this store instead of holding its
+// own level, so it always reflects the current baseline/override without anyone mutating a shared Logger instance.
+class GlobalLevelStore {
+public:
+    ov::log::Level get() const {
+        if (const auto& perThread = perThreadOverride()) {
+            return *perThread;
         }
+        // Relaxed is sufficient: _baseline is the only state readers synchronize on here - no other write needs to
+        // become visible alongside it, so there is no happens-before relationship to establish beyond the atomicity
+        // of this load itself.
+        return _baseline.load(std::memory_order_relaxed);
     }
-    static Logger log("global", logLvl);
+
+    void setBaseline(ov::log::Level lvl) {
+        // See get(): relaxed matches, no other memory access is ordered against this store.
+        _baseline.store(lvl, std::memory_order_relaxed);
+    }
+
+    // Installs a per-thread override and returns the previous one so it can be restored (supports nesting).
+    std::optional<ov::log::Level> exchangeOverride(std::optional<ov::log::Level> next) {
+        auto previous = perThreadOverride();
+        perThreadOverride() = next;
+        return previous;
+    }
+
+private:
+    static std::optional<ov::log::Level>& perThreadOverride() {
+        thread_local std::optional<ov::log::Level> perThread;
+        return perThread;
+    }
+
+    std::atomic<ov::log::Level> _baseline{ov::log::Level::NO};
+};
+
+GlobalLevelStore& Logger::globalStore() {
+    // Meyers singleton: the baseline is seeded once from the build default and, in developer/debug builds, the
+    // OV_NPU_LOG_LEVEL environment variable. Thereafter the baseline is only changed via Logger::global().setLevel()
+    // (atomic), and per-call overrides go through the thread-local slot - so no shared Logger instance is mutated.
+    // GlobalLevelStore holds an atomic and is therefore non-copyable; seed it in place after construction.
+    static GlobalLevelStore store;
+    static std::once_flag seeded;
+    std::call_once(seeded, [] {
+#if defined(NPU_PLUGIN_DEVELOPER_BUILD) || !defined(NDEBUG)
+        ov::log::Level logLvl = ov::log::Level::WARNING;
+        if (const auto env = std::getenv("OV_NPU_LOG_LEVEL")) {
+            try {
+                std::istringstream is(env);
+                is >> logLvl;
+            } catch (...) {
+                // Use default log level
+            }
+        }
+        store.setBaseline(logLvl);
 #else
-    static Logger log("global", ov::log::Level::ERR);
+        store.setBaseline(ov::log::Level::ERR);
 #endif
+    });
+    return store;
+}
+
+Logger& Logger::global() {
+    static Logger log = Logger::followingGlobal("global");
     return log;
+}
+
+Logger Logger::followingGlobal(const char* name) {
+    Logger logger(name);
+    logger._followsGlobal = true;
+    return logger;
+}
+
+Logger::GlobalLevelGuard::GlobalLevelGuard(ov::log::Level lvl)
+    : _previous(Logger::globalStore().exchangeOverride(lvl)) {}
+
+Logger::GlobalLevelGuard::GlobalLevelGuard(GlobalLevelGuard&& other) noexcept
+    : _armed(other._armed),
+      _previous(other._previous) {
+    other._armed = false;
+}
+
+Logger::GlobalLevelGuard::~GlobalLevelGuard() {
+    if (_armed) {
+        Logger::globalStore().exchangeOverride(_previous);
+    }
 }
 
 Logger::Logger(const char* name, ov::log::Level lvl) : _name(name), _logLevel(lvl) {}
@@ -78,8 +162,23 @@ Logger Logger::clone(const char* name) const {
     return logger;
 }
 
+ov::log::Level Logger::level() const {
+    return _followsGlobal ? globalStore().get() : _logLevel;
+}
+
+Logger& Logger::setLevel(ov::log::Level lvl) {
+    if (_followsGlobal) {
+        // Setting the level on a global-following logger updates the shared persistent baseline (thread-safe),
+        // never a per-instance field.
+        globalStore().setBaseline(lvl);
+    } else {
+        _logLevel = lvl;
+    }
+    return *this;
+}
+
 bool Logger::isActive(ov::log::Level msgLevel) const {
-    return static_cast<int32_t>(msgLevel) <= static_cast<int32_t>(_logLevel);
+    return static_cast<int32_t>(msgLevel) <= static_cast<int32_t>(level());
 }
 
 namespace {
@@ -105,10 +204,17 @@ const char* getColor(ov::log::Level msgLevel) {
 
 void Logger::addEntryPackedActive(ov::log::Level msgLevel, std::string_view msg) const {
     char timeStr[] = "undefined_time";
-    time_t now = time(nullptr);
-    struct tm* loctime = localtime(&now);
-    if (loctime != nullptr) {
-        strftime(timeStr, sizeof(timeStr), "%H:%M:%S", loctime);
+    std::time_t now = std::time(nullptr);
+    // localtime() returns a pointer to a single shared static std::tm, so concurrent loggers would race on it. Use
+    // the reentrant, per-platform variant into a local buffer instead.
+    std::tm localTimeBuf{};
+#if defined(_WIN32)
+    const bool haveLocalTime = (localtime_s(&localTimeBuf, &now) == 0);
+#else
+    const bool haveLocalTime = (localtime_r(&now, &localTimeBuf) != nullptr);
+#endif
+    if (haveLocalTime) {
+        std::strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &localTimeBuf);
     }
 
     using namespace std::chrono;

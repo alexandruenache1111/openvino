@@ -9,6 +9,7 @@
 #pragma once
 
 #include <iostream>
+#include <optional>
 #include <sstream>
 
 #include "openvino/runtime/properties.hpp"
@@ -28,6 +29,10 @@ std::string printFormattedCStr(const char* fmt, ...)
     ;
 #endif
 
+// Thread-safe backing store for the process-wide log level (baseline + per-thread override). Definition lives in
+// logger.cpp: only Logger::globalStore() needs it, and an incomplete type is enough for that declaration.
+class GlobalLevelStore;
+
 class Logger {
 public:
     static Logger& global();
@@ -36,6 +41,30 @@ public:
     Logger(const std::string&, ov::log::Level lvl = ov::log::Level::NO) = delete;
     Logger(const std::string_view& name, ov::log::Level lvl = ov::log::Level::NO) = delete;
     Logger(const Logger& log) = default;
+
+    // Creates a logger that reflects the process-wide level store (baseline + per-thread override) rather than a
+    // fixed snapshot. Use this for long-lived loggers that must honor a per-call LOG_LEVEL without being mutated.
+    static Logger followingGlobal(const char* name);
+
+    // RAII scope that overrides the process-wide log level for the current thread only, restoring the previous value
+    // on destruction. Use this to apply a per-call LOG_LEVEL for the duration of a compile/import/query call: the
+    // change is visible to every global-following logger on this thread and is rolled back when the call returns,
+    // without touching the shared baseline or racing other threads.
+    class GlobalLevelGuard {
+    public:
+        explicit GlobalLevelGuard(ov::log::Level lvl);
+        ~GlobalLevelGuard();
+        GlobalLevelGuard(const GlobalLevelGuard&) = delete;
+        GlobalLevelGuard& operator=(const GlobalLevelGuard&) = delete;
+        // Movable so it can be held in a std::optional and returned by value; a moved-from guard is disarmed and
+        // restores nothing on destruction.
+        GlobalLevelGuard(GlobalLevelGuard&& other) noexcept;
+        GlobalLevelGuard& operator=(GlobalLevelGuard&&) = delete;
+
+    private:
+        bool _armed = true;
+        std::optional<ov::log::Level> _previous;
+    };
 
     Logger clone(const char* name) const;
     Logger clone(const std::string& name) const = delete;
@@ -52,14 +81,9 @@ public:
         _name = name;
     }
 
-    auto level() const {
-        return _logLevel;
-    }
+    ov::log::Level level() const;
 
-    Logger& setLevel(ov::log::Level lvl) {
-        _logLevel = lvl;
-        return *this;
-    }
+    Logger& setLevel(ov::log::Level lvl);
 
     bool isActive(ov::log::Level msgLevel) const;
 
@@ -89,6 +113,9 @@ public:
     }
 
 private:
+    // Returns the shared store used by global() and followingGlobal() loggers.
+    static GlobalLevelStore& globalStore();
+
     void addEntryPackedActive(ov::log::Level msgLevel, const std::string_view msg) const;
 
     template <typename... Args>
@@ -108,6 +135,9 @@ private:
 
 private:
     const char* _name;
+    // When true, this logger reads its level from the shared global store (baseline + per-thread override) and
+    // ignores _logLevel. When false, it is an ordinary value-semantic logger holding its own fixed level.
+    bool _followsGlobal = false;
     ov::log::Level _logLevel = ov::log::Level::NO;
 };
 
