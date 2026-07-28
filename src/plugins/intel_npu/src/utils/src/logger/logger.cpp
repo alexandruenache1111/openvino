@@ -129,10 +129,7 @@ GlobalLevelStore& Logger::globalStore() {
     return store;
 }
 
-Logger& Logger::global() {
-    static Logger log = Logger::followingGlobal("global");
-    return log;
-}
+Logger::Logger(const char* name, ov::log::Level lvl) : _name(name), _logLevel(lvl) {}
 
 Logger Logger::followingGlobal(const char* name) {
     Logger logger(name);
@@ -140,14 +137,13 @@ Logger Logger::followingGlobal(const char* name) {
     return logger;
 }
 
+Logger& Logger::global() {
+    static Logger log = Logger::followingGlobal("global");
+    return log;
+}
+
 Logger::GlobalLevelGuard::GlobalLevelGuard(ov::log::Level lvl)
     : _previous(Logger::globalStore().exchangeOverride(lvl)) {}
-
-Logger::GlobalLevelGuard::GlobalLevelGuard(GlobalLevelGuard&& other) noexcept
-    : _armed(other._armed),
-      _previous(other._previous) {
-    other._armed = false;
-}
 
 Logger::GlobalLevelGuard::~GlobalLevelGuard() {
     if (_armed) {
@@ -155,7 +151,11 @@ Logger::GlobalLevelGuard::~GlobalLevelGuard() {
     }
 }
 
-Logger::Logger(const char* name, ov::log::Level lvl) : _name(name), _logLevel(lvl) {}
+Logger::GlobalLevelGuard::GlobalLevelGuard(GlobalLevelGuard&& other) noexcept
+    : _armed(other._armed),
+      _previous(other._previous) {
+    other._armed = false;
+}
 
 Logger Logger::clone(const char* name) const {
     Logger logger(name, level());

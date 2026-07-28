@@ -63,13 +63,13 @@ public:
                                     const ov::AnyMap& properties) const override;
 
 private:
-    // Permanently updates the global log level baseline from a LOG_LEVEL in @p properties (used by set_property).
+    // Permanently updates the global log level
     void update_log_level(const ov::AnyMap& properties) const;
 
-    // Returns an RAII guard that applies a per-call LOG_LEVEL from @p properties for the current thread only,
+    // Returns an RAII guard that applies a per-call LOG_LEVEL for the current thread only,
     // restoring the previous level when the returned optional is destroyed. Empty when no LOG_LEVEL was provided.
     // Used by compile_model/import_model/query_model so a per-call level is scoped to the call and never leaks into
-    // the persistent baseline or races other threads. Keep the returned value alive for the whole call.
+    // the persistent baseline or races other threads.
     [[nodiscard]] std::optional<Logger::GlobalLevelGuard> scoped_log_level(const ov::AnyMap& properties) const;
 
     /**

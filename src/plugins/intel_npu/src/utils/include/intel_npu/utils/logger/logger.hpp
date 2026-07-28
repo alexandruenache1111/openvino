@@ -29,8 +29,6 @@ std::string printFormattedCStr(const char* fmt, ...)
     ;
 #endif
 
-// Thread-safe backing store for the process-wide log level (baseline + per-thread override). Definition lives in
-// logger.cpp: only Logger::globalStore() needs it, and an incomplete type is enough for that declaration.
 class GlobalLevelStore;
 
 class Logger {
