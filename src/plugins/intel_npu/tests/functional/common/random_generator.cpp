@@ -2,7 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "random_generator.hpp"
+#include <random>
+
+class RandomGenerator {
+public:
+    static std::mt19937& get();
+
+private:
+    static RandomGenerator& getInstance();
+
+    RandomGenerator() = default;
+    RandomGenerator(const RandomGenerator&) = delete;
+    RandomGenerator& operator=(const RandomGenerator&) = delete;
+    ~RandomGenerator() = default;
+
+    std::mt19937 generator{std::random_device{}()};
+};
 
 RandomGenerator& RandomGenerator::getInstance() {
     static RandomGenerator instance;
