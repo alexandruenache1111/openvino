@@ -12,7 +12,7 @@
 #include <exception>
 
 #include "behavior/ov_infer_request/inference.hpp"
-#include "common/utils.hpp"
+#include "utils.hpp"
 #include "common_test_utils/ov_tensor_utils.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 #include "openvino/core/any.hpp"

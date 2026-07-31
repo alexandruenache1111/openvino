@@ -12,7 +12,7 @@
 #include <string>
 #include <tuple>
 
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 #include "common_test_utils/test_assertions.hpp"
 #include "functional_test_utils/skip_tests_config.hpp"
 #include "intel_npu/utils/zero/zero_init.hpp"

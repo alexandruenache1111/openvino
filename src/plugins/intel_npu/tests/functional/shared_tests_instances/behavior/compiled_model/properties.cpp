@@ -6,9 +6,9 @@
 
 #include <openvino/util/codec_xor.hpp>
 
-#include "common/functions.hpp"
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "functions.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 
 using namespace ov::test::behavior;

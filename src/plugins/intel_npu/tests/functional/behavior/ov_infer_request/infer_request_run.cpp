@@ -4,7 +4,7 @@
 
 #include "infer_request_run.hpp"
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 
 using namespace ov::test::behavior;

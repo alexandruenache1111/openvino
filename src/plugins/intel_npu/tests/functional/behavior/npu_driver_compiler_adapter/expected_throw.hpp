@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #include "shared_test_classes/base/ov_behavior_test_utils.hpp"
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 
 using CompilationParams = std::tuple<std::string,  // Device name
                                      ov::AnyMap    // Config

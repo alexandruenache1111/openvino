@@ -4,8 +4,8 @@
 
 #include "execution_graph_tests/duplicate_inputs_outputs_names.hpp"
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "common_test_utils/test_constants.hpp"
 
 using namespace ExecutionGraphTests;

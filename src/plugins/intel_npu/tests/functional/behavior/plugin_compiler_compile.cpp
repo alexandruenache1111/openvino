@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "behavior/plugin_compiler_compile.hpp"
+#include "plugin_compiler_compile.hpp"
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 #include "intel_npu/config/options.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 

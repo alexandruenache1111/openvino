@@ -7,7 +7,7 @@
 #include <behavior/compiled_model/model_cache.hpp>
 #include <memory>
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 #include "common_test_utils/test_assertions.hpp"
 #include "functional_test_utils/skip_tests_config.hpp"
 #include "intel_npu/npu_private_properties.hpp"

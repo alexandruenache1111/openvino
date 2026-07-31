@@ -5,8 +5,8 @@
 #include <behavior/ov_infer_request/io_tensor.hpp>
 #include <vector>
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 
 using namespace ov::test::behavior;
 

@@ -4,8 +4,8 @@
 
 #include "behavior/ov_infer_request/iteration_chaining.hpp"
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 
 using namespace ov::test::behavior;

@@ -4,7 +4,7 @@
 
 #include "compatibility_string.hpp"
 
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 
 using namespace ov::test::behavior;
 

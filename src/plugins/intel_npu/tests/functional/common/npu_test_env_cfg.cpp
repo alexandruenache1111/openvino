@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 
 #include <cstdlib>
 #include <stdexcept>

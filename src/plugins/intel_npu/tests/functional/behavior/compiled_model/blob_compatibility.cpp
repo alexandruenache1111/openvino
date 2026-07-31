@@ -9,7 +9,7 @@
 #include <map>
 #include <string>
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 
 using namespace ov::test::behavior;
 

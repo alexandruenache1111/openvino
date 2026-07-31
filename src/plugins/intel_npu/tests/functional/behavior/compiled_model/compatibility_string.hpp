@@ -13,8 +13,8 @@
 #include <openvino/runtime/intel_npu/properties.hpp>
 
 #include "behavior/compiled_model/properties.hpp"
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "common_test_utils/subgraph_builders/conv_pool_relu.hpp"
 #include "intel_npu/utils/zero/zero_init.hpp"
 #include "openvino/pass/serialize.hpp"

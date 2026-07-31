@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "internal/backend/zero_infer_request_tests.hpp"
+#include "backend/zero_infer_request_tests.hpp"
 
 using namespace ov::test::behavior;
 

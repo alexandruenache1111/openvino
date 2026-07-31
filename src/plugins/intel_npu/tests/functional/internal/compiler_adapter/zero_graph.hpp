@@ -9,9 +9,9 @@
 
 #include <common_test_utils/test_assertions.hpp>
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
-#include "common/zero_init_mock.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
+#include "zero_init_mock.hpp"
 #include "common_test_utils/subgraph_builders/multi_single_conv.hpp"
 #include "driver_compiler_adapter.hpp"
 #include "intel_npu/utils/utils.hpp"

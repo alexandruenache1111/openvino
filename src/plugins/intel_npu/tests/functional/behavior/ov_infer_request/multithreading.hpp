@@ -6,7 +6,7 @@
 
 #include <future>
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 
 namespace ov {
 namespace test {

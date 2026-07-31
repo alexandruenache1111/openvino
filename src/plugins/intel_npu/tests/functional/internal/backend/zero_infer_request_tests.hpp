@@ -6,9 +6,9 @@
 
 #include <gtest/gtest.h>
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
-#include "common/zero_init_mock.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
+#include "zero_init_mock.hpp"
 #include "common_test_utils/file_utils.hpp"
 #include "common_test_utils/ov_plugin_cache.hpp"
 #include "common_test_utils/ov_tensor_utils.hpp"

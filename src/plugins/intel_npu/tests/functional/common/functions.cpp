@@ -3,7 +3,7 @@
 //
 
 #include "functions.hpp"
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 #include "openvino/op/softmax.hpp"
 #include "openvino/opsets/opset11.hpp"
 #include "openvino/runtime/intel_npu/properties.hpp"

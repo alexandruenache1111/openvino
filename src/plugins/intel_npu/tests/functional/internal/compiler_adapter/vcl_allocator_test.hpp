@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 #include "common_test_utils/file_utils.hpp"
 #include "common_test_utils/subgraph_builders/conv_pool_relu.hpp"
 #include "intel_npu/utils/utils.hpp"

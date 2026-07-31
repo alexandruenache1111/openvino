@@ -3,8 +3,8 @@
 //
 
 #include "behavior/ov_plugin/core_integration_sw.hpp"
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "common_test_utils/data_utils.hpp"
 #include "intel_npu/config/options.hpp"
 #include "openvino/runtime/intel_npu/properties.hpp"

@@ -7,8 +7,8 @@
 #include <array>
 #include <openvino/util/codec_xor.hpp>
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "intel_npu/config/options.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 #include "openvino/runtime/intel_cpu/properties.hpp"

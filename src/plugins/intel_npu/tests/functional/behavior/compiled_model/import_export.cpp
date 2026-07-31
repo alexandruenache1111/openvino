@@ -8,7 +8,7 @@
 
 #include <openvino/runtime/intel_npu/properties.hpp>
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 
 using namespace ov::test::behavior;
 

@@ -4,7 +4,7 @@
 
 #include "vcl_allocator_test.hpp"
 
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 
 namespace {
 

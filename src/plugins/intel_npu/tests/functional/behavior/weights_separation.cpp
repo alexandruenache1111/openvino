@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "behavior/weights_separation.hpp"
+#include "weights_separation.hpp"
 
 using namespace ov::test::behavior;
 

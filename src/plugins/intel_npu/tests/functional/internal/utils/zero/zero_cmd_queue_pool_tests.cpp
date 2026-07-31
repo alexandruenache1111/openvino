@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "internal/utils/zero/zero_cmd_queue_pool_tests.hpp"
+#include "utils/zero/zero_cmd_queue_pool_tests.hpp"
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 
 using namespace ov::test::behavior;
 

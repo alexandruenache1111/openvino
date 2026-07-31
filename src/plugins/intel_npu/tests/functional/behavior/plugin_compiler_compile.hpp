@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "common/functions.hpp"
-#include "common/npu_test_env_cfg.hpp"
+#include "functions.hpp"
+#include "npu_test_env_cfg.hpp"
 #include "shared_test_classes/base/ov_behavior_test_utils.hpp"
 
 namespace {

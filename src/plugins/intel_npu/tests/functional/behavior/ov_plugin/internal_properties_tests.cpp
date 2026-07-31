@@ -6,7 +6,7 @@
 
 #include <cstdlib>
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 #include "intel_npu/config/options.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 #include "openvino/util/common_util.hpp"

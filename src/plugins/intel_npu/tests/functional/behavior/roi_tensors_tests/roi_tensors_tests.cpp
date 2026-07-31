@@ -4,8 +4,8 @@
 
 #include "roi_tensors_tests.hpp"
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "intel_npu/config/options.hpp"
 
 using namespace ov::test::behavior;

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "behavior/fail_gracefully_forward_compatibility.hpp"
+#include "fail_gracefully_forward_compatibility.hpp"
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "intel_npu/config/options.hpp"
 
 using namespace ov::test::behavior;

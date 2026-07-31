@@ -7,9 +7,9 @@
 #include <filesystem>
 
 #include "behavior/ov_plugin/properties_tests.hpp"
-#include "common/functions.hpp"
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "functions.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 #include "common_test_utils/data_utils.hpp"
 #include "common_test_utils/subgraph_builders/concat_with_params.hpp"
 #include "common_test_utils/subgraph_builders/conv_pool_relu.hpp"

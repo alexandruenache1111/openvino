@@ -3,8 +3,8 @@
 //
 
 #include "behavior/ov_infer_request/inference.hpp"
-#include "common/utils.hpp"
-#include "common/npu_test_env_cfg.hpp"
+#include "utils.hpp"
+#include "npu_test_env_cfg.hpp"
 
 namespace {
 

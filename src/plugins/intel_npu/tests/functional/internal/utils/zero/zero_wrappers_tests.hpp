@@ -15,9 +15,9 @@
 #include <random>
 #include <thread>
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
-#include "common/zero_init_mock.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
+#include "zero_init_mock.hpp"
 #include "functional_test_utils/ov_plugin_cache.hpp"
 #include "intel_npu/utils/zero/zero_init.hpp"
 #include "intel_npu/utils/zero/zero_wrappers.hpp"

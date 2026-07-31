@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include "common/npu_test_env_cfg.hpp"
+#include "npu_test_env_cfg.hpp"
 #include "shared_test_classes/base/ov_behavior_test_utils.hpp"
 
 namespace {

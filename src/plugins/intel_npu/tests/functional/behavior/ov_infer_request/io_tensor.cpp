@@ -6,8 +6,8 @@
 
 #include <vector>
 
-#include "common/npu_test_env_cfg.hpp"
-#include "common/utils.hpp"
+#include "npu_test_env_cfg.hpp"
+#include "utils.hpp"
 
 namespace {
 const std::vector<ov::AnyMap> configs = {{}};

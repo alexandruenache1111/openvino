@@ -9,7 +9,7 @@
 #include <future>
 #include <memory>
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 
 namespace ov {
 namespace test {

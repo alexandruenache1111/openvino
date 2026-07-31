@@ -4,7 +4,7 @@
 
 #include "compile_and_infer_different_element_type.hpp"
 
-#include "common/utils.hpp"
+#include "utils.hpp"
 
 namespace {
 

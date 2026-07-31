@@ -5,7 +5,7 @@
 #include <utility>
 
 #include "behavior/ov_plugin/core_threading.hpp"
-#include "common/utils.hpp"
+#include "utils.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 
 namespace {
