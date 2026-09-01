@@ -21,7 +21,7 @@ namespace test {
 // DISABLE_IDLE_MEMORY_PRUNING) stay unregistered here, exactly like the real one when no backend exists
 void registerOfflineOptions(OptionsDesc& options, FilteredConfig& config);
 
-// Compiles a real model through the real /VCL path with no backend involved
+// Compiles via a fake ICompilerAdapter (no real VCL, no backend) and returns the resulting fake IGraph.
 std::shared_ptr<IGraph> compileOffline(const std::shared_ptr<ov::Model>& model, FilteredConfig& config);
 
 // Minimal ov::IPlugin clone: CompiledModel only needs a plugin pointer for base bookkeeping
