@@ -7,13 +7,79 @@
 #include <string>
 #include <utility>
 
-#include "intel_npu/common/compiler_adapter_factory.hpp"
+#include "intel_npu/common/icompiler_adapter.hpp"
+#include "intel_npu/common/network_metadata.hpp"
 #include "intel_npu/config/npuw.hpp"
 #include "intel_npu/config/options.hpp"
 #include "openvino/runtime/intel_npu/properties.hpp"
 
 namespace intel_npu {
 namespace test {
+
+namespace {
+
+class FakeGraph final : public IGraph {
+public:
+    FakeGraph() {
+        _metadata.name = "FakeCompiledGraph";
+    }
+
+    std::optional<bool> is_profiling_blob() const override {
+        return std::nullopt;
+    }
+
+    std::pair<uint64_t, std::optional<std::vector<uint64_t>>> export_blob(std::ostream& stream) const override {
+        static constexpr std::string_view fakeBlob = "FAKE_VCL_BLOB";
+        stream.write(fakeBlob.data(), static_cast<std::streamsize>(fakeBlob.size()));
+        return {fakeBlob.size(), std::nullopt};
+    }
+
+    std::optional<std::string_view> get_compatibility_descriptor() const override {
+        static constexpr std::string_view fakeDescriptor = "FAKE_COMPATIBILITY_DESCRIPTOR";
+        return fakeDescriptor;
+    }
+
+    const NetworkMetadata& get_metadata() const override {
+        return _metadata;
+    }
+
+protected:
+    void initialize_impl(const FilteredConfig&) override {
+        _init_completed = true;
+    }
+
+private:
+    NetworkMetadata _metadata;
+};
+
+class FakeCompilerAdapter final : public ICompilerAdapter {
+public:
+    std::shared_ptr<IGraph> compile(const std::shared_ptr<const ov::Model>&, const FilteredConfig&) const override {
+        return std::make_shared<FakeGraph>();
+    }
+
+    std::shared_ptr<IGraph> compileWS(std::shared_ptr<ov::Model>&&, const FilteredConfig&) const override {
+        OPENVINO_THROW("compileWS not implemented in FakeCompilerAdapter");
+    }
+
+    ov::SupportedOpsMap query(const std::shared_ptr<const ov::Model>&, const FilteredConfig&) const override {
+        return {};
+    }
+
+    uint32_t get_version() const override {
+        return 1u;
+    }
+
+    std::vector<std::string> get_supported_options() const override {
+        return {};
+    }
+
+    bool is_option_supported(const std::string&, const std::optional<std::string>&) const override {
+        return true;
+    }
+};
+
+}  // namespace
 
 void registerOfflineOptions(OptionsDesc& options, FilteredConfig& config) {
     options.reset();
@@ -101,23 +167,13 @@ void registerOfflineOptions(OptionsDesc& options, FilteredConfig& config) {
 #undef REGISTER_OPTION
 }
 
+// Uses a FakeCompilerAdapter instead of the real PluginCompilerAdapter/VCL path, so this is a
+// genuine unit test dependency, not a real (if offline) compile - no driver, no external compiler
+// library, and no version-compatibility quirks to work around
 std::shared_ptr<IGraph> compileOffline(const std::shared_ptr<ov::Model>& model, FilteredConfig& config) {
-    ov::SoPtr<IEngineBackend> backend{nullptr};
-    auto compilerType = ov::intel_npu::CompilerType::PREFER_PLUGIN;
-    CompilerAdapterFactory factory;
-    auto compiler = factory.getCompiler(backend, compilerType, config.get<PLATFORM>());
-    config.update({{ov::intel_npu::compiler_version.name(), std::to_string(compiler->get_version())}});
-
-    // copied behavior from functiona/internal/backend/zero_infer_request_tests.cpp
-    if (compiler->is_option_supported(MODEL_SERIALIZER_VERSION::key().data())) {
-        config.enable(MODEL_SERIALIZER_VERSION::key().data(), true);
-        config.update({{MODEL_SERIALIZER_VERSION::key().data(),
-                        MODEL_SERIALIZER_VERSION::toString(ov::intel_npu::ModelSerializerVersion::ALL_WEIGHTS_COPY)}});
-    } else {
-        config.enable(MODEL_SERIALIZER_VERSION::key().data(), false);
-    }
-
-    return compiler->compile(model, config);
+    FakeCompilerAdapter compiler;
+    config.update({{ov::intel_npu::compiler_version.name(), std::to_string(compiler.get_version())}});
+    return compiler.compile(model, config);
 }
 
 }  // namespace test
