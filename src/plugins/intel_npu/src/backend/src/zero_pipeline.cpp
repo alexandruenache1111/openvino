@@ -81,7 +81,9 @@ IPipeline::IPipeline(const std::shared_ptr<ZeroInitStructsHolder>& init_structs,
         if (perf_count_enabled) {
             _logger.debug("IPipeline - profiling type == ov::intel_npu::ProfilingType::INFER");
             _npu_profiling =
-                std::make_shared<zeroProfiling::NpuInferProfiling>(_init_structs, _config.get<LOG_LEVEL>());
+                std::make_shared<zeroProfiling::NpuInferProfiling>(_init_structs,
+                                                                    _config.get<LOG_LEVEL>(),
+                                                                    _batch_size);
             if (compiled_with_profiling.value_or(false)) {
                 _logger.warning("IPipeline - model was compiled with layer profiling enabled, but the current "
                                 "profiling type is 'INFER'");
@@ -255,7 +257,8 @@ Pipeline::Pipeline(const std::shared_ptr<ZeroInitStructsHolder>& init_structs,
         /// append timestamp command if feature was activated
         if (_npu_profiling != nullptr) {
             _command_lists.at(i)->appendBarrier();
-            _command_lists.at(i)->appendNpuTimestamp(reinterpret_cast<uint64_t*>(_npu_profiling->npu_ts_infer_start));
+            _command_lists.at(i)->appendNpuTimestamp(
+                reinterpret_cast<uint64_t*>(_npu_profiling->getTimestampStart(i)));
         }
 
         _command_lists.at(i)->appendGraphExecute(static_cast<ze_graph_handle_t>(_graph->get_handle()),
@@ -264,7 +267,8 @@ Pipeline::Pipeline(const std::shared_ptr<ZeroInitStructsHolder>& init_structs,
         /// append timestamp command if feature was activated
         if (_npu_profiling != nullptr) {
             _command_lists.at(i)->appendBarrier();
-            _command_lists.at(i)->appendNpuTimestamp(reinterpret_cast<uint64_t*>(_npu_profiling->npu_ts_infer_end));
+            _command_lists.at(i)->appendNpuTimestamp(
+                reinterpret_cast<uint64_t*>(_npu_profiling->getTimestampEnd(i)));
         }
 
         if (_run_inferences_sequentially) {
@@ -287,6 +291,10 @@ Pipeline::Pipeline(const std::shared_ptr<ZeroInitStructsHolder>& init_structs,
 
 void Pipeline::push() {
     _logger.debug("push - started");
+
+    if (_npu_profiling != nullptr) {
+        _npu_profiling->markHostInferStart();
+    }
 
     if (_run_inferences_sequentially) {
         if (_pipeline_unique_id_per_graph) {
@@ -348,8 +356,12 @@ void Pipeline::pull() {
         }
         /// sample npu timestamps if feature was activated
         if (_npu_profiling != nullptr) {
-            _npu_profiling->sampleNpuTimestamps();
+            _npu_profiling->sampleNpuTimestamps(i);
         }
+    }
+
+    if (_npu_profiling != nullptr) {
+        _npu_profiling->markHostInferEnd();
     }
 
     _logger.debug("pull - completed");

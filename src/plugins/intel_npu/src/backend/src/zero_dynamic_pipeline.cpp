@@ -237,6 +237,10 @@ DynamicPipeline::DynamicPipeline(const std::shared_ptr<ZeroInitStructsHolder>& i
 void DynamicPipeline::push() {
     _logger.debug("push - started");
 
+    if (_npu_profiling != nullptr) {
+        _npu_profiling->markHostInferStart();
+    }
+
     const npu_vm_runtime_handle_t vmRuntime = static_cast<npu_vm_runtime_handle_t>(_graph->get_handle());
     OPENVINO_ASSERT(vmRuntime != nullptr, "DynamicPipeline requires a valid VM runtime engine");
 
@@ -509,7 +513,8 @@ void DynamicPipeline::pull() {
     }
     /// sample npu timestamps if feature was activated
     if (_npu_profiling != nullptr) {
-        _npu_profiling->sampleNpuTimestamps();
+        _npu_profiling->sampleNpuTimestamps(0);
+        _npu_profiling->markHostInferEnd();
     }
 
     _logger.debug("pull - completed");
