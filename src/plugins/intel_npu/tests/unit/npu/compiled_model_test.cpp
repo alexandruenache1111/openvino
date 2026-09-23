@@ -97,12 +97,11 @@ protected:
     void SetUp() override {
         options = std::make_shared<OptionsDesc>();
         config = std::make_unique<FilteredConfig>(options);
-        test::registerOfflineOptions(*options, *config);
+        test::registerOfflineOptions(*options);
         // WORKLOAD_TYPE is backend-gated in production and stays unregistered in the shared offline
         // helper; CompiledModel's own set_property() forwarding doesn't care about that gate, so add
-        // it locally for the tests that need it (disabled by default, same as every other option).
+        // it locally for the tests that need it.
         options->add<WORKLOAD_TYPE>();
-        config->enable(ov::workload_type.name(), false);
         config->update({{ov::intel_npu::platform.name(), std::string(ov::intel_npu::Platform::NPU5010)}});
 
         model = ov::test::utils::make_multi_single_conv();
@@ -111,7 +110,7 @@ protected:
     }
 
     std::shared_ptr<CompiledModel> makeCompiledModel() {
-        return std::make_shared<CompiledModel>(model, plugin, nullptr, graph, *config, std::nullopt);
+        return std::make_shared<CompiledModel>(model, plugin, nullptr, graph, *config, ov::AnyMap{}, std::nullopt);
     }
 
     std::shared_ptr<OptionsDesc> options;
@@ -176,7 +175,6 @@ TEST_F(CompiledModelUnitTests, CreateInferRequestSucceedsWithDevice) {
     using ::testing::Return;
 
     // NUM_STREAMS=0 forces a non-null result executor so the pipeline stages actually get scheduled.
-    config->enable(NUM_STREAMS::key().data(), true);
     config->update({{NUM_STREAMS::key().data(), "0"}});
 
     auto mockInferRequest = std::make_shared<NiceMock<MockInferRequest>>();
@@ -189,7 +187,7 @@ TEST_F(CompiledModelUnitTests, CreateInferRequestSucceedsWithDevice) {
     auto mockGraph = std::make_shared<NiceMock<MockGraph>>();
 
     auto compiledModel =
-        std::make_shared<CompiledModel>(model, plugin, mockDevice, mockGraph, *config, std::nullopt);
+        std::make_shared<CompiledModel>(model, plugin, mockDevice, mockGraph, *config, ov::AnyMap{}, std::nullopt);
 
     std::shared_ptr<ov::IAsyncInferRequest> asyncRequest;
     OV_ASSERT_NO_THROW(asyncRequest = compiledModel->create_infer_request());
@@ -209,13 +207,11 @@ TEST_F(CompiledModelUnitTests, CreateSyncInferRequestThrowsNotImplemented) {
 TEST_F(CompiledModelUnitTests, SetPropertyForwardsWorkloadTypeToGraph) {
     using ::testing::NiceMock;
 
-    config->enable(ov::workload_type.name(), true);
-
     auto mockGraph = std::make_shared<NiceMock<MockGraph>>();
     EXPECT_CALL(*mockGraph, set_workload_type(ov::WorkloadType::EFFICIENT)).Times(1);
 
     auto compiledModel =
-        std::make_shared<CompiledModel>(model, plugin, nullptr, mockGraph, *config, std::nullopt);
+        std::make_shared<CompiledModel>(model, plugin, nullptr, mockGraph, *config, ov::AnyMap{}, std::nullopt);
 
     OV_ASSERT_NO_THROW(compiledModel->set_property({ov::workload_type(ov::WorkloadType::EFFICIENT)}));
 }
@@ -223,13 +219,11 @@ TEST_F(CompiledModelUnitTests, SetPropertyForwardsWorkloadTypeToGraph) {
 TEST_F(CompiledModelUnitTests, SetPropertyForwardsModelPriorityToGraph) {
     using ::testing::NiceMock;
 
-    config->enable(ov::hint::model_priority.name(), true);
-
     auto mockGraph = std::make_shared<NiceMock<MockGraph>>();
     EXPECT_CALL(*mockGraph, set_model_priority(ov::hint::Priority::HIGH)).Times(1);
 
     auto compiledModel =
-        std::make_shared<CompiledModel>(model, plugin, nullptr, mockGraph, *config, std::nullopt);
+        std::make_shared<CompiledModel>(model, plugin, nullptr, mockGraph, *config, ov::AnyMap{}, std::nullopt);
 
     OV_ASSERT_NO_THROW(compiledModel->set_property({ov::hint::model_priority(ov::hint::Priority::HIGH)}));
 }
@@ -241,9 +235,7 @@ TEST_F(CompiledModelUnitTests, CreateInferRequestInitializesGraphWhenCreationIsD
 
     // CREATE_EXECUTOR=0 defers graph initialization from the constructor to the first
     // create_infer_request() call instead.
-    config->enable(CREATE_EXECUTOR::key().data(), true);
     config->update({{CREATE_EXECUTOR::key().data(), "0"}});
-    config->enable(NUM_STREAMS::key().data(), true);
     config->update({{NUM_STREAMS::key().data(), "0"}});
 
     auto mockInferRequest = std::make_shared<NiceMock<MockInferRequest>>();
@@ -256,7 +248,7 @@ TEST_F(CompiledModelUnitTests, CreateInferRequestInitializesGraphWhenCreationIsD
     auto mockGraph = std::make_shared<NiceMock<MockGraph>>();
 
     auto compiledModel =
-        std::make_shared<CompiledModel>(model, plugin, mockDevice, mockGraph, *config, std::nullopt);
+        std::make_shared<CompiledModel>(model, plugin, mockDevice, mockGraph, *config, ov::AnyMap{}, std::nullopt);
 
     std::shared_ptr<ov::IAsyncInferRequest> asyncRequest;
     OV_ASSERT_NO_THROW(asyncRequest = compiledModel->create_infer_request());
@@ -267,8 +259,6 @@ TEST_F(CompiledModelUnitTests, CreateInferRequestInitializesGraphWhenCreationIsD
 }
 
 TEST_F(CompiledModelUnitTests, ExportModelEncryptsBlobWhenCallbackIsSet) {
-    config->enable(ov::cache_encryption_callbacks.name(), true);
-
     auto compiledModel = makeCompiledModel();
 
     ov::EncryptionCallbacks callbacks;
@@ -283,7 +273,6 @@ TEST_F(CompiledModelUnitTests, ExportModelEncryptsBlobWhenCallbackIsSet) {
 }
 
 TEST_F(CompiledModelUnitTests, ConfigureStreamExecutorsUsesDedicatedThreadsWhenSequential) {
-    config->enable(RUN_INFERENCES_SEQUENTIALLY::key().data(), true);
     config->update({{RUN_INFERENCES_SEQUENTIALLY::key().data(), "YES"}});
 
     auto compiledModel = makeCompiledModel();
@@ -293,7 +282,6 @@ TEST_F(CompiledModelUnitTests, ConfigureStreamExecutorsUsesDedicatedThreadsWhenS
 }
 
 TEST_F(CompiledModelUnitTests, ConfigureStreamExecutorsScalesWaitWorkersWithNumStreams) {
-    config->enable(NUM_STREAMS::key().data(), true);
     config->update({{NUM_STREAMS::key().data(), "2"}});
 
     auto compiledModel = makeCompiledModel();
@@ -306,8 +294,6 @@ TEST_F(CompiledModelUnitTests, ConfigureStreamExecutorsScalesWaitWorkersWithNumS
 // is logged unconditionally before that check runs, on both the set and get paths.
 TEST_F(CompiledModelUnitTests, CpuPinningPropertyLogsDeprecationOnGetAndSet) {
     OPENVINO_SUPPRESS_DEPRECATED_START
-    config->enable(ov::hint::enable_cpu_pinning.name(), true);
-
     auto compiledModel = makeCompiledModel();
     OV_EXPECT_THROW_HAS_SUBSTRING(compiledModel->set_property({{ov::hint::enable_cpu_pinning.name(), true}}),
                                   ov::Exception,
@@ -324,8 +310,6 @@ TEST_F(CompiledModelUnitTests, SetPropertyThrowsForUnsupportedKey) {
 }
 
 TEST_F(CompiledModelUnitTests, GetPropertyReturnsEmptyForWriteOnlyProperty) {
-    config->enable(ov::cache_encryption_callbacks.name(), true);
-
     auto compiledModel = makeCompiledModel();
     ov::Any result;
     OV_ASSERT_NO_THROW(result = compiledModel->get_property(ov::cache_encryption_callbacks.name()));

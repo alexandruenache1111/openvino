@@ -14,12 +14,10 @@
 namespace intel_npu {
 namespace test {
 
-// Duplicating logic because init_config() can be used only within plugin.cpp
-// Does same thing as Plugin::getConfigForSpecificCompiler() but without a backend, so it can be used here
-// This means this function should be maintained manually in sync with the one in production
-// Deliberately mirrors production: backend-gated options (MAX_TILES, WORKLOAD_TYPE,
-// DISABLE_IDLE_MEMORY_PRUNING) stay unregistered here, exactly like the real one when no backend exists
-void registerOfflineOptions(OptionsDesc& options, FilteredConfig& config);
+// Duplicating logic because register_options() is file-local to plugin.cpp and can't be called from
+// test code. Mirrors Plugin's option registration for the "no backend" case; maintained by hand in
+// sync with the production version.
+void registerOfflineOptions(OptionsDesc& options);
 
 // Compiles via a fake ICompilerAdapter (no real VCL, no backend) and returns the resulting fake IGraph.
 std::shared_ptr<IGraph> compileOffline(const std::shared_ptr<ov::Model>& model, FilteredConfig& config);

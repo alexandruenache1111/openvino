@@ -81,16 +81,10 @@ public:
 
 }  // namespace
 
-void registerOfflineOptions(OptionsDesc& options, FilteredConfig& config) {
+void registerOfflineOptions(OptionsDesc& options) {
     options.reset();
 
-#define REGISTER_OPTION(OPT_TYPE)                             \
-    do {                                                      \
-        auto dummyopt = details::makeOptionModel<OPT_TYPE>(); \
-        std::string o_name = dummyopt.key().data();           \
-        options.add<OPT_TYPE>();                              \
-        config.enable(std::move(o_name), false);              \
-    } while (0)
+#define REGISTER_OPTION(OPT_TYPE) options.add<OPT_TYPE>()
 
     REGISTER_OPTION(LOG_LEVEL);
     REGISTER_OPTION(COMPILE_LOG_LEVEL);
@@ -142,27 +136,17 @@ void registerOfflineOptions(OptionsDesc& options, FilteredConfig& config) {
     REGISTER_OPTION(ENABLE_STRIDES_FOR);
     REGISTER_OPTION(SHARED_COMMON_QUEUE);
     REGISTER_OPTION(CACHE_ENCRYPTION_CALLBACKS);
-    REGISTER_OPTION(RUNTIME_REQUIREMENTS);
-    REGISTER_OPTION(COMPATIBILITY_CHECK);
+    REGISTER_OPTION(MAX_TILES);
+    REGISTER_OPTION(MODEL_PTR);
+    REGISTER_OPTION(DISABLE_IDLE_MEMORY_PRUNING);
 
-    // No backend => MAX_TILES / WORKLOAD_TYPE / DISABLE_IDLE_MEMORY_PRUNING stay unregistered here,
-    // exactly like Plugin's init_config() does when BackendsRegistry finds no usable device.
-
-    config.parseEnvVars();
+    // No backend => WORKLOAD_TYPE stays unregistered here, exactly like Plugin's register_options()
+    // does when BackendsRegistry finds no usable device.
 
     for_each_exposed_npuw_option([&](auto tag) {
         using Opt = typename decltype(tag)::type;
         REGISTER_OPTION(Opt);
     });
-
-    config.enableRuntimeOptions();
-    config.enable(ov::log::level.name(), true);
-    config.enable(ov::hint::performance_mode.name(), true);
-    config.enable(ov::enable_profiling.name(), true);
-    // Normally a real compiler-support probe (PluginPropertyManager::setProperty) enables these for
-    // the resolved compiler; tests set them directly on the config, so enable them explicitly here.
-    config.enable(ov::intel_npu::platform.name(), true);
-    config.enable(ov::intel_npu::compiler_version.name(), true);
 
 #undef REGISTER_OPTION
 }
