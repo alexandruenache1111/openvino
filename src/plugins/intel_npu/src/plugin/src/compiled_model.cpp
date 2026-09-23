@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "include/compiled_model.hpp"
+#include "compiled_model.hpp"
 
 #include <cinttypes>
 #include <fstream>
