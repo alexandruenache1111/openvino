@@ -136,12 +136,14 @@ protected:
     std::unique_ptr<PluginPropertyManager> propertiesManager;
 };
 
+// Device-derived max-tile information must be unavailable without a backend.
 TEST_P(OfflineCompilationUnitTests, ReadMaxTilesAndExpectThrow) {
     OV_EXPECT_THROW_HAS_SUBSTRING(propertiesManager->getProperty(ov::intel_npu::max_tiles.name()),
                                   ov::Exception,
                                   "Unsupported configuration key");
 }
 
+// The advertised offline property set must not claim support for max tiles.
 TEST_P(OfflineCompilationUnitTests, ReadSupportedPropertiesMaxTilesNotPresent) {
     std::vector<ov::PropertyName> supportedProperties;
     OV_ASSERT_NO_THROW(
@@ -151,6 +153,7 @@ TEST_P(OfflineCompilationUnitTests, ReadSupportedPropertiesMaxTilesNotPresent) {
                 supportedProperties.end());
 }
 
+// Compatibility checks require a device and must stay hidden during offline compilation.
 TEST_P(OfflineCompilationUnitTests, CompatibilityCheckNotSupportedOffline) {
     std::vector<ov::PropertyName> supportedProperties;
     OV_ASSERT_NO_THROW(
@@ -160,39 +163,85 @@ TEST_P(OfflineCompilationUnitTests, CompatibilityCheckNotSupportedOffline) {
                 supportedProperties.end());
 }
 
-// The three methods below are what Plugin::compile_model() calls to resolve device/platform/compiler
-// type *before* ever handing off to CompilerAdapterFactory - the last plugin-owned decision point
-// before the flow crosses into compiler/driver territory. Each is a pure read of the properties map
-// with a config fallback, so none of them touch CompilerAdapterFactory or VCL.
+// The following tests cover Plugin::compile_model() target resolution before the VCL boundary.
+// Each method reads request properties with a configured-value fallback.
+// A request-level device ID must override the offline fixture's configured value.
 TEST_P(OfflineCompilationUnitTests, DetermineDeviceIdReturnsPropertyOverride) {
     ASSERT_EQ(propertiesManager->determineDeviceId({{ov::device::id.name(), std::string("3")}}), "3");
 }
 
+// An omitted device ID must resolve to the empty offline value.
 TEST_P(OfflineCompilationUnitTests, DetermineDeviceIdFallsBackToConfigWhenNotProvided) {
     ASSERT_TRUE(propertiesManager->determineDeviceId({}).empty());
 }
 
+// A request-level platform must override the fixture's selected platform.
 TEST_P(OfflineCompilationUnitTests, DeterminePlatformReturnsPropertyOverride) {
     ASSERT_EQ(propertiesManager->determinePlatform({{ov::intel_npu::platform.name(), std::string("9999")}}), "9999");
 }
 
+// An omitted platform must retain the platform selected during setup.
 TEST_P(OfflineCompilationUnitTests, DeterminePlatformFallsBackToPreviouslyConfiguredValue) {
     const auto expectedPlatform = GetParam().at(ov::intel_npu::platform.name()).as<std::string>();
     ASSERT_EQ(propertiesManager->determinePlatform({}), expectedPlatform);
 }
 
+// A request-level compiler type must override the default offline preference.
 TEST_P(OfflineCompilationUnitTests, DetermineCompilerTypeReturnsPropertyOverride) {
     ASSERT_EQ(propertiesManager->determineCompilerType(
                   {{ov::intel_npu::compiler_type.name(), ov::intel_npu::CompilerType::DRIVER}}),
               ov::intel_npu::CompilerType::DRIVER);
 }
 
+// An omitted compiler type must use the configured PREFER_PLUGIN default.
 TEST_P(OfflineCompilationUnitTests, DetermineCompilerTypeFallsBackToConfigDefault) {
     // Fixture never sets NPU_COMPILER_TYPE, so this is the option's own default (PREFER_PLUGIN).
     ASSERT_EQ(propertiesManager->determineCompilerType({}), ov::intel_npu::CompilerType::PREFER_PLUGIN);
 }
 
-// CompilerAdapterFactory rejects DRIVER compilation without a backend before touching the VCL compiler.
+// Recognized compile properties must reach the compiler configuration.
+TEST_P(OfflineCompilationUnitTests, MergeCompilePropertyIntoFilteredConfig) {
+    auto [filteredConfig, unknownProperties] = propertiesManager->getMergedConfigAndUnknownProperties(
+        {{ov::intel_npu::turbo.name(), true}},
+        ConfigMergeMode::Compile);
+
+    ASSERT_TRUE(filteredConfig.has<TURBO>());
+    ASSERT_TRUE(filteredConfig.get<TURBO>());
+    ASSERT_TRUE(unknownProperties.empty());
+}
+
+// Properties unknown to the plugin must remain available to downstream consumers.
+TEST_P(OfflineCompilationUnitTests, PreserveUnknownCompileProperty) {
+    constexpr auto unknownProperty = "OFFLINE_TEST_UNKNOWN_PROPERTY";
+    const ov::AnyMap properties{{unknownProperty, true},
+                                {ov::intel_npu::compiler_type.name(), ov::intel_npu::CompilerType::PLUGIN}};
+
+    auto [filteredConfig, unknownProperties] =
+        propertiesManager->getMergedConfigAndUnknownProperties(properties, ConfigMergeMode::Compile);
+
+    ASSERT_TRUE(filteredConfig.has<COMPILER_TYPE>());
+    ASSERT_EQ(filteredConfig.get<COMPILER_TYPE>(), ov::intel_npu::CompilerType::PLUGIN);
+    ASSERT_EQ(unknownProperties.size(), 1);
+    ASSERT_TRUE(unknownProperties.count(unknownProperty));
+    ASSERT_TRUE(unknownProperties.at(unknownProperty).as<bool>());
+}
+
+// Compile merging must preserve the request's platform and compiler context.
+TEST_P(OfflineCompilationUnitTests, MergeCompileContextUsesRequestedPlatformAndCompiler) {
+    const ov::AnyMap properties{{ov::intel_npu::platform.name(), std::string("NPU3720")},
+                                {ov::intel_npu::compiler_type.name(), ov::intel_npu::CompilerType::PLUGIN}};
+
+    auto [filteredConfig, unknownProperties] =
+        propertiesManager->getMergedConfigAndUnknownProperties(properties, ConfigMergeMode::Compile);
+
+    ASSERT_TRUE(filteredConfig.has<PLATFORM>());
+    ASSERT_EQ(filteredConfig.get<PLATFORM>(), "NPU3720");
+    ASSERT_TRUE(filteredConfig.has<COMPILER_TYPE>());
+    ASSERT_EQ(filteredConfig.get<COMPILER_TYPE>(), ov::intel_npu::CompilerType::PLUGIN);
+    ASSERT_TRUE(unknownProperties.empty());
+}
+
+// DRIVER compilation must fail immediately when offline compilation has no backend.
 TEST_P(OfflineCompilationUnitTests, GetCompilerDriverTypeWithNullBackendThrows) {
     CompilerAdapterFactory factory;
     auto compilerType = ov::intel_npu::CompilerType::DRIVER;
